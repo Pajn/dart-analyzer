@@ -771,6 +771,10 @@ class MatchExpression extends Expression {
     _expression = _becomeParentOf(expression);
     _clauses = _becomeParentOf(clauses);
   }
+
+  Expression get expression => _expression;
+
+  NodeList<MatchClause> get clauses => _clauses;
 }
 
 class MatchClause extends AstNode {
@@ -791,6 +795,12 @@ class MatchClause extends AstNode {
     _patternGuard = _becomeParentOf(patternGuard);
     _armExpression = _becomeParentOf(armExpression);
   }
+
+  Pattern get pattern => _pattern;
+
+  PatternGuard get patternGuard => _patternGuard;
+
+  ExpressionStatement get armExpression => _armExpression;
 }
 
 class Pattern extends AstNode {
@@ -803,6 +813,26 @@ class Pattern extends AstNode {
           message, new CaughtException(new AnalysisException(message), null));
     }
     _pattern = _becomeParentOf(pattern);
+  }
+
+  Literal get pattern => _pattern;
+
+  @override
+  Token get beginToken => _pattern.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_pattern);
+
+  @override
+  Token get endToken => _pattern.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitPattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_pattern, visitor);
   }
 }
 
@@ -823,10 +853,33 @@ class PatternGuard extends AstNode {
 
   PatternGuard(
       this.ifKeyword,
-      this.leftParanthesis,
+      this.leftParenthesis,
       Expression condition,
-      this.rightParanthesis) {
+      this.rightParenthesis) {
     _condition = _becomeParentOf(condition);
+  }
+
+  Expression get condition => _condition;
+
+  @override
+  Token get beginToken => ifKeyword;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(ifKeyword)
+    ..add(leftParenthesis)
+    ..add(_condition)
+    ..add(rightParenthesis);
+
+  @override
+  Token get endToken => rightParenthesis;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitPatternGuard(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_condition, visitor);
   }
 }
 
@@ -1636,6 +1689,23 @@ class AstCloner implements AstVisitor<AstNode> {
           cloneNode(node.value));
 
   @override
+  AstNode visitMatchClause(MatchClause node) => new MatchClause(
+      cloneNode(node.pattern),
+      cloneNode(node.patternGuard),
+      cloneToken(node.fatArrow),
+      cloneNode(node.armExpression));
+
+  @override
+  AstNode visitMatchExpression(MatchExpression node) => new MatchExpression(
+      cloneToken(node.matchKeyword),
+      cloneToken(node.leftParenthesis),
+      cloneNode(node.expression),
+      cloneToken(node.rightParenthesis),
+      cloneToken(node.leftBracket),
+      cloneNodeList(node.clauses),
+      cloneToken(node.rightBracket));
+
+  @override
   MethodDeclaration visitMethodDeclaration(MethodDeclaration node) =>
       new MethodDeclaration(
           cloneNode(node.documentationComment),
@@ -1704,6 +1774,18 @@ class AstCloner implements AstVisitor<AstNode> {
           cloneToken(node.ofKeyword),
           cloneNode(node.libraryName),
           cloneToken(node.semicolon));
+
+  @override
+  AstNode visitPattern(Pattern node) =>
+      new Pattern(cloneNode(node.pattern));
+
+  @override
+  AstNode visitPatternGuard(PatternGuard node) =>
+      new PatternGuard(
+          cloneToken(node.ifKeyword),
+          cloneToken(node.leftParenthesis),
+          cloneNode(node.condition),
+          cloneToken(node.rightParenthesis));
 
   @override
   PostfixExpression visitPostfixExpression(PostfixExpression node) =>
@@ -2590,6 +2672,27 @@ class AstComparator implements AstVisitor<bool> {
   }
 
   @override
+  bool visitMatchClause(MatchClause node) {
+    MatchClause other = _other as MatchClause;
+    return isEqualNodes(node.pattern, other.pattern) &&
+        isEqualNodes(node.patternGuard, other.patternGuard) &&
+        isEqualTokens(node.fatArrow, other.fatArrow) &&
+        isEqualNodes(node.armExpression, other.armExpression);
+  }
+
+  @override
+  bool visitMatchExpression(MatchExpression node) {
+    MatchExpression other = _other as MatchExpression;
+    return isEqualTokens(node.matchKeyword, other.matchKeyword) &&
+        isEqualTokens(node.leftParenthesis, other.leftParenthesis) &&
+        isEqualNodes(node.expression, other.expression) &&
+        isEqualTokens(node.rightParenthesis, other.rightParenthesis) &&
+        isEqualTokens(node.leftBracket, other.leftBracket) &&
+        _isEqualNodeLists(node.clauses, other.clauses) &&
+        isEqualTokens(node.rightBracket, other.rightBracket);
+  }
+
+  @override
   bool visitNamedExpression(NamedExpression node) {
     NamedExpression other = _other as NamedExpression;
     return isEqualNodes(node.name, other.name) &&
@@ -2646,6 +2749,21 @@ class AstComparator implements AstVisitor<bool> {
         isEqualTokens(node.ofKeyword, other.ofKeyword) &&
         isEqualNodes(node.libraryName, other.libraryName) &&
         isEqualTokens(node.semicolon, other.semicolon);
+  }
+
+  @override
+  bool visitPattern(Pattern node) {
+    Pattern other = _other as Pattern;
+    return isEqualNodes(node.pattern, other.pattern);
+  }
+
+  @override
+  bool visitPatternGuard(PatternGuard node) {
+    PatternGuard other = _other as PatternGuard;
+    return isEqualTokens(node.ifKeyword, other.ifKeyword) &&
+        isEqualTokens(node.leftParenthesis, other.leftParenthesis) &&
+        isEqualNodes(node.condition, other.condition) &&
+        isEqualTokens(node.rightParenthesis, other.rightParenthesis);
   }
 
   @override
@@ -3336,6 +3454,10 @@ abstract class AstVisitor<R> {
 
   R visitMapLiteralEntry(MapLiteralEntry node);
 
+  R visitMatchClause(MatchClause node);
+
+  R visitMatchExpression(MatchExpression node);
+
   R visitMethodDeclaration(MethodDeclaration node);
 
   R visitMethodInvocation(MethodInvocation node);
@@ -3353,6 +3475,10 @@ abstract class AstVisitor<R> {
   R visitPartDirective(PartDirective node);
 
   R visitPartOfDirective(PartOfDirective node);
+
+  R visitPattern(Pattern node);
+
+  R visitPatternGuard(PatternGuard node);
 
   R visitPostfixExpression(PostfixExpression node);
 
