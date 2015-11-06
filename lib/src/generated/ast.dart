@@ -910,10 +910,10 @@ class ConstantValuePattern extends Pattern {
   }
 }
 
-class IdentifierPattern extends Pattern {
+abstract class DefinesIdentifierPattern extends Pattern {
   SimpleIdentifier _identifier;
 
-  IdentifierPattern(SimpleIdentifier identifier) {
+  DefinesIdentifierPattern(SimpleIdentifier identifier) {
     if (identifier == null) {
       String message = "The identifier is null";
       AnalysisEngine.instance.logger.logError(
@@ -935,6 +935,11 @@ class IdentifierPattern extends Pattern {
     }
     return _identifier.staticElement as LocalVariableElement;
   }
+}
+
+class IdentifierPattern extends DefinesIdentifierPattern {
+
+  IdentifierPattern(SimpleIdentifier identifier) : super(identifier);
 
   @override
   Token get beginToken => _identifier.beginToken;
@@ -1035,6 +1040,50 @@ class RangePattern extends Pattern {
   void visitChildren(AstVisitor visitor) {
     _safelyVisitChild(_startRange, visitor);
     _safelyVisitChild(_endRange, visitor);
+  }
+}
+
+class TypeTestPattern extends DefinesIdentifierPattern {
+  Token isKeyword;
+
+  Token notOperator;
+
+  TypeName _type;
+
+  TypeTestPattern(
+      SimpleIdentifier identifier,
+      this.isKeyword,
+      this.notOperator,
+      TypeName type) : super(identifier) {
+    _type = _becomeParentOf(type);
+  }
+
+  TypeName get type => _type;
+
+  void set type(TypeName type) {
+    _type = _becomeParentOf(type);
+  }
+
+  @override
+  Token get beginToken => _identifier.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_identifier)
+    ..add(isKeyword)
+    ..add(notOperator)
+    ..add(_type);
+
+  @override
+  Token get endToken => _type.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitTypeTestPattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_identifier, visitor);
+    _safelyVisitChild(_type, visitor);
   }
 }
 
@@ -2166,6 +2215,12 @@ class AstCloner implements AstVisitor<AstNode> {
           cloneNodeList(node.typeParameters), cloneToken(node.rightBracket));
 
   @override
+  TypeTestPattern visitTypeTestPattern(TypeTestPattern node) =>
+      new TypeTestPattern(cloneNode(node.identifier),
+          cloneToken(node.isKeyword), cloneToken(node.notOperator),
+          cloneNode(node.type));
+
+  @override
   VariableDeclaration visitVariableDeclaration(VariableDeclaration node) =>
       new VariableDeclaration(cloneNode(node.name), cloneToken(node.equals),
           cloneNode(node.initializer));
@@ -3225,6 +3280,15 @@ class AstComparator implements AstVisitor<bool> {
   }
 
   @override
+  bool visitTypeTestPattern(TypeTestPattern node) {
+    TypeTestPattern other = _other as TypeTestPattern;
+    return isEqualNodes(node.identifier, other.identifier) &&
+           isEqualTokens(node.isKeyword, other.isKeyword) &&
+           isEqualTokens(node.notOperator, other.notOperator) &&
+           isEqualNodes(node.type, other.type);
+  }
+
+  @override
   bool visitVariableDeclaration(VariableDeclaration node) {
     VariableDeclaration other = _other as VariableDeclaration;
     return isEqualNodes(
@@ -3780,6 +3844,8 @@ abstract class AstVisitor<R> {
   R visitTypeParameter(TypeParameter node);
 
   R visitTypeParameterList(TypeParameterList node);
+
+  R visitTypeTestPattern(TypeTestPattern node);
 
   R visitVariableDeclaration(VariableDeclaration node);
 
@@ -9692,6 +9758,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   @override
   R visitTypeParameterList(TypeParameterList node) => visitNode(node);
 
+  @override
+  R visitTypeTestPattern(TypeTestPattern node) => visitPattern(node);
+
   R visitUriBasedDirective(UriBasedDirective node) => visitDirective(node);
 
   @override
@@ -11260,6 +11329,12 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
   TypeParameterList visitTypeParameterList(TypeParameterList node) =>
       new TypeParameterList(_mapToken(node.leftBracket),
           _cloneNodeList(node.typeParameters), _mapToken(node.rightBracket));
+
+  @override
+  TypeTestPattern visitTypeTestPattern(TypeTestPattern node) =>
+      new TypeTestPattern(_cloneNode(node.identifier),
+          _mapToken(node.isKeyword), _mapToken(node.notOperator),
+          _cloneNode(node.type));
 
   @override
   VariableDeclaration visitVariableDeclaration(VariableDeclaration node) =>
@@ -14668,6 +14743,18 @@ class NodeReplacer implements AstVisitor<bool> {
     return visitNode(node);
   }
 
+  @override
+  bool visitTypeTestPattern(TypeTestPattern node) {
+    if (identical(node.identifier, _oldNode)) {
+      node.identifier = _newNode as SimpleIdentifier;
+      return true;
+    } else if (identical(node.type, _oldNode)) {
+      node.type = _newNode as TypeName;
+      return true;
+    }
+    return visitNode(node);
+  }
+
   bool visitUriBasedDirective(UriBasedDirective node) {
     if (identical(node.uri, _oldNode)) {
       node.uri = _newNode as StringLiteral;
@@ -16368,6 +16455,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitTypeTestPattern(TypeTestPattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitVariableDeclaration(VariableDeclaration node) {
     node.visitChildren(this);
     return null;
@@ -17242,6 +17335,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitTypeParameterList(TypeParameterList node) => null;
+
+  @override
+  R visitTypeTestPattern(TypeTestPattern node) => null;
 
   @override
   R visitVariableDeclaration(VariableDeclaration node) => null;
@@ -19716,6 +19812,18 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    _visitNode(node.identifier);
+    if (node.notOperator == null) {
+      _writer.print(' is ');
+    } else {
+      _writer.print(' is! ');
+    }
+    _visitNode(node.type);
+    return null;
+  }
+
+  @override
   Object visitVariableDeclaration(VariableDeclaration node) {
     _visitNodeListWithSeparatorAndSuffix(node.metadata, " ", " ");
     _visitNode(node.name);
@@ -20768,6 +20876,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitTypeParameterList(TypeParameterList node) => visitNode(node);
+
+  @override
+  R visitTypeTestPattern(TypeTestPattern node) => visitNode(node);
 
   @override
   R visitVariableDeclaration(VariableDeclaration node) => visitNode(node);

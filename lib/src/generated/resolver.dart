@@ -2339,6 +2339,13 @@ class DeclarationResolver extends RecursiveAstVisitor<Object> {
   }
 
   @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    SimpleIdentifier variableName = node.identifier;
+    _findIdentifier(_enclosingExecutable.localVariables, variableName);
+    return super.visitTypeTestPattern(node);
+  }
+
+  @override
   Object visitVariableDeclaration(VariableDeclaration node) {
     VariableElement element = null;
     SimpleIdentifier variableName = node.name;
@@ -3114,8 +3121,6 @@ class ElementBuilder extends RecursiveAstVisitor<Object> {
     element.const3 = false;
     element.final2 = false;
     element.hasImplicitType = true;
-    MatchExpression match = clause.parent as MatchExpression;
-    element.type = match.expression.bestType;
     _currentHolder.addLocalVariable(element);
     variableName.staticElement = element;
     return super.visitIdentifierPattern(node);
@@ -3340,6 +3345,25 @@ class ElementBuilder extends RecursiveAstVisitor<Object> {
     _currentHolder.addTypeParameter(typeParameter);
     parameterName.staticElement = typeParameter;
     return super.visitTypeParameter(node);
+  }
+
+  @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    SimpleIdentifier variableName = node.identifier;
+    LocalVariableElementImpl element =
+    new LocalVariableElementImpl.forNode(variableName);
+    MatchClause clause = node.parent as MatchClause;
+    int declarationEnd = node.offset + node.length;
+    int statementEnd = clause.offset + clause.length;
+    element.setVisibleRange(declarationEnd, statementEnd - declarationEnd - 1);
+    element.const3 = false;
+    element.final2 = false;
+    if (node.type == null) {
+      element.hasImplicitType = true;
+    }
+    _currentHolder.addLocalVariable(element);
+    variableName.staticElement = element;
+    return super.visitTypeTestPattern(node);
   }
 
   @override
@@ -12657,9 +12681,6 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
   @override
   Object visitIdentifierPattern(IdentifierPattern node) {
     VariableElement element = node.element;
-    print('visitIdentifierPattern');
-    print(node.identifier);
-    print(element);
     if (element != null) {
       nameScope.define(element);
     }
@@ -12786,6 +12807,16 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
       labelScope = outerScope;
       _implicitLabelScope = outerImplicitScope;
     }
+    return null;
+  }
+
+  @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    VariableElement element = node.element;
+    if (element != null) {
+      nameScope.define(element);
+    }
+    super.visitTypeTestPattern(node);
     return null;
   }
 
@@ -14572,6 +14603,14 @@ class TypeResolverVisitor extends ScopedVisitor {
         typeParameter.bound = bound.type;
       }
     }
+    return null;
+  }
+
+  @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    super.visitTypeTestPattern(node);
+    LocalVariableElementImpl element = node.element as LocalVariableElementImpl;
+    element.type = _getType(node.type);
     return null;
   }
 

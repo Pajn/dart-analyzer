@@ -777,6 +777,13 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitTypeTestPattern(TypeTestPattern node) {
+    _delegates.forEach((delegate) => delegate.visitTypeTestPattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitVariableDeclaration(VariableDeclaration node) {
     _delegates.forEach((delegate) => delegate.visitVariableDeclaration(node));
     node.visitChildren(this);

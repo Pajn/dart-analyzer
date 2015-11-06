@@ -777,6 +777,13 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitTypeTestPattern(TypeTestPattern node) {
+    TypeTestPattern other = this.other;
+    _visitNode(node.identifier, other.identifier);
+    _visitNode(node.type, other.type);
+  }
+
+  @override
   visitVariableDeclaration(VariableDeclaration node) {
     VariableDeclaration other = this.other;
     _visitDeclaration(node, other);

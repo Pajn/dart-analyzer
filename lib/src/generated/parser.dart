@@ -1565,6 +1565,11 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitTypeTestPattern(TypeTestPattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
   AstNode visitVariableDeclaration(VariableDeclaration node) {
     if (identical(_oldNode, node.documentationComment)) {
       throw new InsufficientContextException();
@@ -7214,7 +7219,16 @@ class Parser {
     } else if (_matchesIdentifier()) {
       Identifier identifier = parsePrefixedIdentifier();
       if (identifier is SimpleIdentifier) {
-        return new IdentifierPattern(identifier);
+        if (_matchesKeyword(Keyword.IS)) {
+          Token ifKeyword = getAndAdvance();
+          Token notOperator = null;
+          if (_matches(TokenType.BANG)) {
+            notOperator = getAndAdvance();
+          }
+          return new TypeTestPattern(identifier, ifKeyword, notOperator, parseTypeName());
+        } else {
+          return new IdentifierPattern(identifier);
+        }
       } else {
         return new ConstantValuePattern(identifier);
       }
@@ -11081,6 +11095,16 @@ class ResolutionCopier implements AstVisitor<bool> {
         _isEqualTokens(node.leftBracket, toNode.leftBracket),
         _isEqualNodeLists(node.typeParameters, toNode.typeParameters),
         _isEqualTokens(node.rightBracket, toNode.rightBracket));
+  }
+
+  @override
+  bool visitTypeTestPattern(TypeTestPattern node) {
+    TypeTestPattern toNode = this._toNode as TypeTestPattern;
+    return _and(
+        _isEqualNodes(node.identifier, toNode.identifier),
+        _isEqualTokens(node.isKeyword, toNode.isKeyword),
+        _isEqualTokens(node.notOperator, toNode.notOperator),
+        _isEqualNodes(node.type, toNode.type));
   }
 
   @override
