@@ -1206,6 +1206,16 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitMatchClause(MatchClause node) {
+    // TODO: implement visitMatchClause
+  }
+
+  @override
+  AstNode visitMatchExpression(MatchExpression node) {
+    // TODO: implement visitMatchExpression
+  }
+
+  @override
   AstNode visitMethodDeclaration(MethodDeclaration node) {
     if (identical(_oldNode, node.documentationComment)) {
       throw new InsufficientContextException();
@@ -1303,6 +1313,16 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
       return _parser.parseLibraryIdentifier();
     }
     return _notAChild(node);
+  }
+
+  @override
+  AstNode visitPattern(Pattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
+  AstNode visitPatternGuard(PatternGuard node) {
+    // TODO: implement visitPatternGuard
   }
 
   @override
@@ -10455,6 +10475,29 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
+  bool visitMatchClause(MatchClause node) {
+    MatchClause toNode = this._toNode as MatchClause;
+    return _and(
+        _isEqualNodes(node.pattern, toNode.pattern),
+        _isEqualNodes(node.patternGuard, toNode.patternGuard),
+        _isEqualTokens(node.fatArrow, toNode.fatArrow),
+        _isEqualNodes(node.armExpression, toNode.armExpression));
+  }
+
+  @override
+  bool visitMatchExpression(MatchExpression node) {
+    MatchExpression toNode = this._toNode as MatchExpression;
+    return _and(
+        _isEqualTokens(node.matchKeyword, toNode.matchKeyword),
+        _isEqualTokens(node.leftParenthesis, toNode.leftParenthesis),
+        _isEqualNodes(node.expression, toNode.expression),
+        _isEqualTokens(node.rightParenthesis, toNode.rightParenthesis),
+        _isEqualTokens(node.leftBracket, toNode.leftBracket),
+        _isEqualNodeLists(node.clauses, toNode.clauses),
+        _isEqualTokens(node.rightBracket, toNode.rightBracket));
+  }
+
+  @override
   bool visitMethodDeclaration(MethodDeclaration node) {
     MethodDeclaration toNode = this._toNode as MethodDeclaration;
     return _and(
@@ -10567,6 +10610,16 @@ class ResolutionCopier implements AstVisitor<bool> {
       return true;
     }
     return false;
+  }
+
+  @override
+  bool visitPattern(Pattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
+  bool visitPatternGuard(PatternGuard node) {
+    // TODO: implement visitPatternGuard
   }
 
   @override

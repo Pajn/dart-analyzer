@@ -471,6 +471,20 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitMatchClause(MatchClause node) {
+    _delegates.forEach((delegate) => delegate.visitMatchClause(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  T visitMatchExpression(MatchExpression node) {
+    _delegates.forEach((delegate) => delegate.visitMatchExpression(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitMethodDeclaration(MethodDeclaration node) {
     _delegates.forEach((delegate) => delegate.visitMethodDeclaration(node));
     node.visitChildren(this);
@@ -530,6 +544,20 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   @override
   T visitPartOfDirective(PartOfDirective node) {
     _delegates.forEach((delegate) => delegate.visitPartOfDirective(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  T visitPattern(Pattern node) {
+    _delegates.forEach((delegate) => delegate.visitPattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  T visitPatternGuard(PatternGuard node) {
+    _delegates.forEach((delegate) => delegate.visitPatternGuard(node));
     node.visitChildren(this);
     return null;
   }

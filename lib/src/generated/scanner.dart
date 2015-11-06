@@ -310,6 +310,8 @@ class Keyword {
 
   static const Keyword IS = const Keyword('IS', "is");
 
+  static const Keyword MATCH = const Keyword('MATCH', "match");
+
   static const Keyword NEW = const Keyword('NEW', "new");
 
   static const Keyword NULL = const Keyword('NULL', "null");
@@ -391,6 +393,7 @@ class Keyword {
     IF,
     IN,
     IS,
+    MATCH,
     NEW,
     NULL,
     RETHROW,

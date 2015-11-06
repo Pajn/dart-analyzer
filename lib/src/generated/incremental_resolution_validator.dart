@@ -497,6 +497,22 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitMatchClause(MatchClause node) {
+    MatchClause other = this.other;
+    _visitNode(node.pattern, other.pattern);
+    _visitNode(node.patternGuard, other.patternGuard);
+    _visitNode(node.armExpression, other.armExpression);
+  }
+
+  @override
+  visitMatchExpression(MatchExpression node) {
+    MatchExpression other = this.other;
+    _visitExpression(node, other);
+    _visitNode(node.expression, other.expression);
+    _visitList(node.clauses, other.clauses);
+  }
+
+  @override
   visitMethodDeclaration(MethodDeclaration node) {
     MethodDeclaration other = this.other;
     _visitDeclaration(node, other);
@@ -549,6 +565,18 @@ class _SameResolutionValidator implements AstVisitor {
     PartOfDirective other = this.other;
     _visitDirective(node, other);
     _visitNode(node.libraryName, other.libraryName);
+  }
+
+  @override
+  visitPattern(Pattern node) {
+    Pattern other = this.other;
+    _visitNode(node.pattern, other.pattern);
+  }
+
+  @override
+  visitPatternGuard(PatternGuard node) {
+    PatternGuard other = this.other;
+    _visitNode(node.condition, other.condition);
   }
 
   @override

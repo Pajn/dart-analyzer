@@ -769,12 +769,49 @@ class MatchExpression extends Expression {
       NodeList<MatchClause> clauses,
       this.rightBracket) {
     _expression = _becomeParentOf(expression);
-    _clauses = _becomeParentOf(clauses);
+    _clauses = new NodeList<MatchClause>(this, clauses);
   }
 
   Expression get expression => _expression;
 
+  void set expression(Expression expression) {
+    _expression = _becomeParentOf(expression);
+  }
+
   NodeList<MatchClause> get clauses => _clauses;
+
+//  void set clauses(NodeList<MatchClause> clauses) {
+//    _clauses = new NodeList<MatchClause>(this, clauses);
+//  }
+
+  @override
+  Token get beginToken => matchKeyword;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(matchKeyword)
+    ..add(leftParenthesis)
+    ..add(_expression)
+    ..add(rightParenthesis)
+    ..add(leftBracket)
+    ..add(_clauses)
+    ..add(rightBracket);
+
+  @override
+  Token get endToken => rightBracket;
+
+  // TODO: implement precedence
+  @override
+  int get precedence => null;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitMatchExpression(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_expression, visitor);
+    _clauses.accept(visitor);
+  }
 }
 
 class MatchClause extends AstNode {
@@ -798,9 +835,44 @@ class MatchClause extends AstNode {
 
   Pattern get pattern => _pattern;
 
+  void set pattern(Pattern pattern) {
+    _pattern = _becomeParentOf(pattern);
+  }
+
   PatternGuard get patternGuard => _patternGuard;
 
+  void set patternGuard(PatternGuard patternGuard) {
+    _patternGuard = _becomeParentOf(patternGuard);
+  }
+
   ExpressionStatement get armExpression => _armExpression;
+
+  void set armExpression(ExpressionStatement armExpression) {
+    _armExpression = _becomeParentOf(armExpression);
+  }
+
+  @override
+  Token get beginToken => _pattern.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_pattern)
+    ..add(_patternGuard)
+    ..add(fatArrow)
+    ..add(_armExpression);
+
+  @override
+  Token get endToken => _armExpression.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitMatchClause(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_pattern, visitor);
+    _safelyVisitChild(_patternGuard, visitor);
+    _safelyVisitChild(_armExpression, visitor);
+  }
 }
 
 class Pattern extends AstNode {
@@ -816,6 +888,10 @@ class Pattern extends AstNode {
   }
 
   Literal get pattern => _pattern;
+
+  void set pattern(Literal pattern) {
+    _pattern = _becomeParentOf(pattern);
+  }
 
   @override
   Token get beginToken => _pattern.beginToken;
@@ -860,6 +936,10 @@ class PatternGuard extends AstNode {
   }
 
   Expression get condition => _condition;
+
+  void set condition(Expression condition) {
+    _condition = _becomeParentOf(condition);
+  }
 
   @override
   Token get beginToken => ifKeyword;
@@ -9275,6 +9355,12 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitMapLiteralEntry(MapLiteralEntry node) => visitNode(node);
 
   @override
+  R visitMatchClause(MatchClause node) => visitNode(node);
+
+  @override
+  R visitMatchExpression(MatchExpression node) => visitExpression(node);
+
+  @override
   R visitMethodDeclaration(MethodDeclaration node) => visitClassMember(node);
 
   @override
@@ -9315,6 +9401,12 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPartOfDirective(PartOfDirective node) => visitDirective(node);
+
+  @override
+  R visitPattern(Pattern node) => visitNode(node);
+
+  @override
+  R visitPatternGuard(PatternGuard node) => visitNode(node);
 
   @override
   R visitPostfixExpression(PostfixExpression node) => visitExpression(node);
@@ -10602,6 +10694,31 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
           _cloneNode(node.value));
 
   @override
+  MatchClause visitMatchClause(MatchClause node) {
+    MatchClause copy = new MatchClause(
+        _cloneNode(node.pattern),
+        _cloneNode(node.patternGuard),
+        _mapToken(node.fatArrow),
+        _cloneNode(node.armExpression));
+    return copy;
+  }
+
+  @override
+  MatchExpression visitMatchExpression(MatchExpression node) {
+    MatchExpression copy = new MatchExpression(
+        _mapToken(node.matchKeyword),
+        _mapToken(node.leftParenthesis),
+        _cloneNode(node.expression),
+        _mapToken(node.rightParenthesis),
+        _mapToken(node.leftBracket),
+        _cloneNodeList(node.clauses),
+        _mapToken(node.rightBracket));
+    copy.propagatedType = node.propagatedType;
+    copy.staticType = node.staticType;
+    return copy;
+  }
+
+  @override
   MethodDeclaration visitMethodDeclaration(MethodDeclaration node) =>
       new MethodDeclaration(
           _cloneNode(node.documentationComment),
@@ -10689,6 +10806,22 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
         _cloneNode(node.libraryName),
         _mapToken(node.semicolon));
     copy.element = node.element;
+    return copy;
+  }
+
+  @override
+  Pattern visitPattern(Pattern node) {
+    Pattern copy = new Pattern(_cloneNode(node.pattern));
+    return copy;
+  }
+
+  @override
+  PatternGuard visitPatternGuard(PatternGuard node) {
+    PatternGuard copy = new PatternGuard(
+        _mapToken(node.ifKeyword),
+        _mapToken(node.leftParenthesis),
+        _cloneNode(node.condition),
+        _mapToken(node.rightParenthesis));
     return copy;
   }
 
@@ -13900,6 +14033,30 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   @override
+  bool visitMatchClause(MatchClause node) {
+    if (identical(node.pattern, _oldNode)) {
+      node.pattern = _newNode as Pattern;
+      return true;
+    } else if (identical(node.patternGuard, _oldNode)) {
+      node.patternGuard = _newNode as PatternGuard;
+      return true;
+    } else if (identical(node.armExpression, _oldNode)) {
+      node.armExpression = _newNode as ExpressionStatement;
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
+  bool visitMatchExpression(MatchExpression node) {
+    if (identical(node.expression, _oldNode)) {
+      node.expression = _newNode as Expression;
+      return true;
+    } //TODO: clauses
+    return visitNode(node);
+  }
+
+  @override
   bool visitMethodDeclaration(MethodDeclaration node) {
     if (identical(node.returnType, _oldNode)) {
       node.returnType = _newNode as TypeName;
@@ -14009,6 +14166,24 @@ class NodeReplacer implements AstVisitor<bool> {
       return true;
     }
     return visitAnnotatedNode(node);
+  }
+
+  @override
+  bool visitPattern(Pattern node) {
+    if (identical(node.pattern, _oldNode)) {
+      node.pattern = _newNode as Literal;
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
+  bool visitPatternGuard(PatternGuard node) {
+    if (identical(node.condition, _oldNode)) {
+      node.condition = _newNode as Expression;
+      return true;
+    }
+    return visitNode(node);
   }
 
   @override
@@ -15686,6 +15861,18 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitMatchClause(MatchClause node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  R visitMatchExpression(MatchExpression node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitMethodDeclaration(MethodDeclaration node) {
     node.visitChildren(this);
     return null;
@@ -15735,6 +15922,18 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPartOfDirective(PartOfDirective node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  R visitPattern(Pattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  R visitPatternGuard(PatternGuard node) {
     node.visitChildren(this);
     return null;
   }
@@ -16648,6 +16847,12 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
   R visitMapLiteralEntry(MapLiteralEntry node) => null;
 
   @override
+  R visitMatchClause(MatchClause node) => null;
+
+  @override
+  R visitMatchExpression(MatchExpression node) => null;
+
+  @override
   R visitMethodDeclaration(MethodDeclaration node) => null;
 
   @override
@@ -16673,6 +16878,12 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPartOfDirective(PartOfDirective node) => null;
+
+  @override
+  R visitPattern(Pattern node) => null;
+
+  @override
+  R visitPatternGuard(PatternGuard node) => null;
 
   @override
   R visitPostfixExpression(PostfixExpression node) => null;
@@ -18872,6 +19083,25 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitMatchClause(MatchClause node) {
+    _visitNode(node.pattern);
+    _visitNode(node.patternGuard);
+    _writer.print("=>");
+    _visitNode(node.armExpression);
+    return null;
+  }
+
+  @override
+  Object visitMatchExpression(MatchExpression node) {
+    _writer.print("match (");
+    _visitNode(node.expression);
+    _writer.print(") {");
+    _visitNodeListWithSeparator(node.clauses, " ");
+    _writer.print("}");
+    return null;
+  }
+
+  @override
   Object visitMethodDeclaration(MethodDeclaration node) {
     _visitNodeListWithSeparatorAndSuffix(node.metadata, " ", " ");
     _visitTokenWithSuffix(node.externalKeyword, " ");
@@ -18955,6 +19185,20 @@ class ToSourceVisitor implements AstVisitor<Object> {
     _writer.print("part of ");
     _visitNode(node.libraryName);
     _writer.print(';');
+    return null;
+  }
+
+  @override
+  Object visitPattern(Pattern node) {
+    _visitNode(node.pattern);
+    return null;
+  }
+
+  @override
+  Object visitPatternGuard(PatternGuard node) {
+    _writer.print("if (");
+    _visitNode(node.condition);
+    _writer.print(")");
     return null;
   }
 
@@ -20090,6 +20334,12 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
   R visitMapLiteralEntry(MapLiteralEntry node) => visitNode(node);
 
   @override
+  R visitMatchClause(MatchClause node) => visitNode(node);
+
+  @override
+  R visitMatchExpression(MatchExpression node) => visitNode(node);
+
+  @override
   R visitMethodDeclaration(MethodDeclaration node) => visitNode(node);
 
   @override
@@ -20121,6 +20371,12 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPartOfDirective(PartOfDirective node) => visitNode(node);
+
+  @override
+  R visitPattern(Pattern node) => visitNode(node);
+
+  @override
+  R visitPatternGuard(PatternGuard node) => visitNode(node);
 
   @override
   R visitPostfixExpression(PostfixExpression node) => visitNode(node);
