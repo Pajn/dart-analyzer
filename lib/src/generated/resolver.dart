@@ -2214,6 +2214,13 @@ class DeclarationResolver extends RecursiveAstVisitor<Object> {
   }
 
   @override
+  Object visitIdentifierPattern(IdentifierPattern node) {
+    SimpleIdentifier variableName = node.identifier;
+    _findIdentifier(_enclosingExecutable.localVariables, variableName);
+    return super.visitIdentifierPattern(node);
+  }
+
+  @override
   Object visitImportDirective(ImportDirective node) {
     String uri = _getStringValue(node.uri);
     if (uri != null) {
@@ -3093,6 +3100,25 @@ class ElementBuilder extends RecursiveAstVisitor<Object> {
     element.typeParameters = holder.typeParameters;
     holder.validate();
     return null;
+  }
+
+  @override
+  Object visitIdentifierPattern(IdentifierPattern node) {
+    SimpleIdentifier variableName = node.identifier;
+    LocalVariableElementImpl element =
+        new LocalVariableElementImpl.forNode(variableName);
+    MatchClause clause = node.parent as MatchClause;
+    int declarationEnd = node.offset + node.length;
+    int statementEnd = clause.offset + clause.length;
+    element.setVisibleRange(declarationEnd, statementEnd - declarationEnd - 1);
+    element.const3 = false;
+    element.final2 = false;
+    element.hasImplicitType = true;
+    MatchExpression match = clause.parent as MatchExpression;
+    element.type = match.expression.bestType;
+    _currentHolder.addLocalVariable(element);
+    variableName.staticElement = element;
+    return super.visitIdentifierPattern(node);
   }
 
   @override
@@ -12629,6 +12655,20 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
   }
 
   @override
+  Object visitIdentifierPattern(IdentifierPattern node) {
+    VariableElement element = node.element;
+    print('visitIdentifierPattern');
+    print(node.identifier);
+    print(element);
+    if (element != null) {
+      nameScope.define(element);
+    }
+    super.visitIdentifierPattern(node);
+    return null;
+  }
+
+
+  @override
   Object visitIfStatement(IfStatement node) {
     safelyVisit(node.condition);
     visitStatementInScope(node.thenStatement);
@@ -12643,6 +12683,20 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
       super.visitLabeledStatement(node);
     } finally {
       labelScope = outerScope;
+    }
+    return null;
+  }
+
+  @override
+  Object visitMatchClause(MatchClause node) {
+    Scope outerScope = nameScope;
+    try {
+      EnclosedScope enclosedScope = new EnclosedScope(nameScope);
+//      _hideNamesDefinedInBlock(enclosedScope, node);
+      nameScope = enclosedScope;
+      super.visitMatchClause(node);
+    } finally {
+      nameScope = outerScope;
     }
     return null;
   }

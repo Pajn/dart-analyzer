@@ -153,6 +153,13 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitConstantValuePattern(ConstantValuePattern node) {
+    _delegates.forEach((delegate) => delegate.visitConstantValuePattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitConstructorDeclaration(ConstructorDeclaration node) {
     _delegates
         .forEach((delegate) => delegate.visitConstructorDeclaration(node));
@@ -357,6 +364,13 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitIdentifierPattern(IdentifierPattern node) {
+    _delegates.forEach((delegate) => delegate.visitIdentifierPattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitIfStatement(IfStatement node) {
     _delegates.forEach((delegate) => delegate.visitIfStatement(node));
     node.visitChildren(this);
@@ -457,6 +471,13 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitLiteralPattern(LiteralPattern node) {
+    _delegates.forEach((delegate) => delegate.visitLiteralPattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitMapLiteral(MapLiteral node) {
     _delegates.forEach((delegate) => delegate.visitMapLiteral(node));
     node.visitChildren(this);
@@ -549,13 +570,6 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
-  T visitPattern(Pattern node) {
-    _delegates.forEach((delegate) => delegate.visitPattern(node));
-    node.visitChildren(this);
-    return null;
-  }
-
-  @override
   T visitPatternGuard(PatternGuard node) {
     _delegates.forEach((delegate) => delegate.visitPatternGuard(node));
     node.visitChildren(this);
@@ -586,6 +600,13 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   @override
   T visitPropertyAccess(PropertyAccess node) {
     _delegates.forEach((delegate) => delegate.visitPropertyAccess(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  T visitRangePattern(RangePattern node) {
+    _delegates.forEach((delegate) => delegate.visitRangePattern(node));
     node.visitChildren(this);
     return null;
   }

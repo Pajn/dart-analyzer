@@ -766,7 +766,7 @@ class MatchExpression extends Expression {
       Expression expression,
       this.rightParenthesis,
       this.leftBracket,
-      NodeList<MatchClause> clauses,
+      List<MatchClause> clauses,
       this.rightBracket) {
     _expression = _becomeParentOf(expression);
     _clauses = new NodeList<MatchClause>(this, clauses);
@@ -779,10 +779,6 @@ class MatchExpression extends Expression {
   }
 
   NodeList<MatchClause> get clauses => _clauses;
-
-//  void set clauses(NodeList<MatchClause> clauses) {
-//    _clauses = new NodeList<MatchClause>(this, clauses);
-//  }
 
   @override
   Token get beginToken => matchKeyword;
@@ -875,40 +871,170 @@ class MatchClause extends AstNode {
   }
 }
 
-class Pattern extends AstNode {
-  Literal _pattern;
+abstract class Pattern extends AstNode {}
 
-  Pattern(Literal pattern) {
-    if (pattern == null) {
+class ConstantValuePattern extends Pattern {
+  PrefixedIdentifier _identifier;
+
+  ConstantValuePattern(PrefixedIdentifier identifier) {
+    if (identifier == null) {
+      String message = "The identifier is null";
+      AnalysisEngine.instance.logger.logError(
+          message, new CaughtException(new AnalysisException(message), null));
+    }
+    _identifier = _becomeParentOf(identifier);
+  }
+
+  PrefixedIdentifier get identifier => _identifier;
+
+  void set identifier(PrefixedIdentifier identifier) {
+    _identifier = _becomeParentOf(identifier);
+  }
+
+  @override
+  Token get beginToken => _identifier.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_identifier);
+
+  @override
+  Token get endToken => _identifier.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitConstantValuePattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_identifier, visitor);
+  }
+}
+
+class IdentifierPattern extends Pattern {
+  SimpleIdentifier _identifier;
+
+  IdentifierPattern(SimpleIdentifier identifier) {
+    if (identifier == null) {
+      String message = "The identifier is null";
+      AnalysisEngine.instance.logger.logError(
+          message, new CaughtException(new AnalysisException(message), null));
+    }
+    _identifier = _becomeParentOf(identifier);
+  }
+
+  SimpleIdentifier get identifier => _identifier;
+
+  void set identifier(SimpleIdentifier identifier) {
+    _identifier = _becomeParentOf(identifier);
+  }
+
+  @override
+  LocalVariableElement get element {
+    if (_identifier == null) {
+      return null;
+    }
+    return _identifier.staticElement as LocalVariableElement;
+  }
+
+  @override
+  Token get beginToken => _identifier.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_identifier);
+
+  @override
+  Token get endToken => _identifier.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitIdentifierPattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_identifier, visitor);
+  }
+}
+
+class LiteralPattern extends Pattern {
+  TerminalLiteral _literal;
+
+  LiteralPattern(Literal literal) {
+    if (literal == null) {
       String message = "The pattern is null";
       AnalysisEngine.instance.logger.logError(
           message, new CaughtException(new AnalysisException(message), null));
     }
-    _pattern = _becomeParentOf(pattern);
+    _literal = _becomeParentOf(literal);
   }
 
-  Literal get pattern => _pattern;
+  Literal get literal => _literal;
 
-  void set pattern(Literal pattern) {
-    _pattern = _becomeParentOf(pattern);
+  void set literal(Literal pattern) {
+    _literal = _becomeParentOf(pattern);
   }
 
   @override
-  Token get beginToken => _pattern.beginToken;
+  Token get beginToken => _literal.beginToken;
 
   @override
   Iterable get childEntities => new ChildEntities()
-    ..add(_pattern);
+    ..add(_literal);
 
   @override
-  Token get endToken => _pattern.endToken;
+  Token get endToken => _literal.endToken;
 
   @override
-  accept(AstVisitor visitor) => visitor.visitPattern(this);
+  accept(AstVisitor visitor) => visitor.visitLiteralPattern(this);
 
   @override
   void visitChildren(AstVisitor visitor) {
-    _safelyVisitChild(_pattern, visitor);
+    _safelyVisitChild(_literal, visitor);
+  }
+}
+
+class RangePattern extends Pattern {
+  NumberLiteral _startRange;
+
+  Token dots;
+
+  NumberLiteral _endRange;
+
+  RangePattern(NumberLiteral start, this.dots, NumberLiteral end) {
+    _startRange = _becomeParentOf(start);
+    _endRange = _becomeParentOf(end);
+  }
+
+  NumberLiteral get startRange => _startRange;
+
+  void set startRange(NumberLiteral start) {
+    _startRange = _becomeParentOf(start);
+  }
+
+  NumberLiteral get endRange => _endRange;
+
+  void set endRange(NumberLiteral end) {
+    _endRange = _becomeParentOf(end);
+  }
+
+  @override
+  Token get beginToken => _startRange.beginToken;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..add(_startRange)
+    ..add(dots)
+    ..add(_endRange);
+
+  @override
+  Token get endToken => _endRange.endToken;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitRangePattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _safelyVisitChild(_startRange, visitor);
+    _safelyVisitChild(_endRange, visitor);
   }
 }
 
@@ -1403,6 +1529,10 @@ class AstCloner implements AstVisitor<AstNode> {
           cloneNode(node.elseExpression));
 
   @override
+  AstNode visitConstantValuePattern(ConstantValuePattern node) =>
+      new ConstantValuePattern(cloneNode(node.identifier));
+
+  @override
   ConstructorDeclaration visitConstructorDeclaration(
           ConstructorDeclaration node) =>
       new ConstructorDeclaration(
@@ -1649,6 +1779,10 @@ class AstCloner implements AstVisitor<AstNode> {
       cloneToken(node.keyword), cloneNodeList(node.hiddenNames));
 
   @override
+  AstNode visitIdentifierPattern(IdentifierPattern node) =>
+      new IdentifierPattern(cloneNode(node.identifier));
+
+  @override
   IfStatement visitIfStatement(IfStatement node) => new IfStatement(
       cloneToken(node.ifKeyword),
       cloneToken(node.leftParenthesis),
@@ -1756,6 +1890,10 @@ class AstCloner implements AstVisitor<AstNode> {
       cloneToken(node.rightBracket));
 
   @override
+  AstNode visitLiteralPattern(LiteralPattern node) =>
+      new LiteralPattern(cloneNode(node.literal));
+
+  @override
   MapLiteral visitMapLiteral(MapLiteral node) => new MapLiteral(
       cloneToken(node.constKeyword),
       cloneNode(node.typeArguments),
@@ -1856,10 +1994,6 @@ class AstCloner implements AstVisitor<AstNode> {
           cloneToken(node.semicolon));
 
   @override
-  AstNode visitPattern(Pattern node) =>
-      new Pattern(cloneNode(node.pattern));
-
-  @override
   AstNode visitPatternGuard(PatternGuard node) =>
       new PatternGuard(
           cloneToken(node.ifKeyword),
@@ -1885,6 +2019,12 @@ class AstCloner implements AstVisitor<AstNode> {
       cloneNode(node.target),
       cloneToken(node.operator),
       cloneNode(node.propertyName));
+
+  @override
+  AstNode visitRangePattern(RangePattern node) => new RangePattern(
+      cloneNode(node.startRange),
+      cloneToken(node.dots),
+      cloneNode(node.endRange));
 
   @override
   RedirectingConstructorInvocation visitRedirectingConstructorInvocation(
@@ -2308,6 +2448,12 @@ class AstComparator implements AstVisitor<bool> {
   }
 
   @override
+  bool visitConstantValuePattern(ConstantValuePattern node) {
+    ConstantValuePattern other = _other as ConstantValuePattern;
+    return isEqualNodes(node.identifier, other.identifier);
+  }
+
+  @override
   bool visitConstructorDeclaration(ConstructorDeclaration node) {
     ConstructorDeclaration other = _other as ConstructorDeclaration;
     return isEqualNodes(
@@ -2586,6 +2732,12 @@ class AstComparator implements AstVisitor<bool> {
   }
 
   @override
+  bool visitIdentifierPattern(IdentifierPattern node) {
+    IdentifierPattern other = _other as IdentifierPattern;
+    return isEqualNodes(node.identifier, other.identifier);
+  }
+
+  @override
   bool visitIfStatement(IfStatement node) {
     IfStatement other = _other as IfStatement;
     return isEqualTokens(node.ifKeyword, other.ifKeyword) &&
@@ -2706,6 +2858,12 @@ class AstComparator implements AstVisitor<bool> {
         isEqualTokens(node.leftBracket, other.leftBracket) &&
         _isEqualNodeLists(node.elements, other.elements) &&
         isEqualTokens(node.rightBracket, other.rightBracket);
+  }
+
+  @override
+  bool visitLiteralPattern(LiteralPattern node) {
+    LiteralPattern other = _other as LiteralPattern;
+    return isEqualNodes(node.literal, other.literal);
   }
 
   @override
@@ -2832,12 +2990,6 @@ class AstComparator implements AstVisitor<bool> {
   }
 
   @override
-  bool visitPattern(Pattern node) {
-    Pattern other = _other as Pattern;
-    return isEqualNodes(node.pattern, other.pattern);
-  }
-
-  @override
   bool visitPatternGuard(PatternGuard node) {
     PatternGuard other = _other as PatternGuard;
     return isEqualTokens(node.ifKeyword, other.ifKeyword) &&
@@ -2874,6 +3026,14 @@ class AstComparator implements AstVisitor<bool> {
     return isEqualNodes(node.target, other.target) &&
         isEqualTokens(node.operator, other.operator) &&
         isEqualNodes(node.propertyName, other.propertyName);
+  }
+
+  @override
+  bool visitRangePattern(RangePattern node) {
+    RangePattern other = _other as RangePattern;
+    return isEqualNodes(node.startRange, other.startRange) &&
+           isEqualTokens(node.dots, other.dots) &&
+           isEqualNodes(node.endRange, other.endRange);
   }
 
   @override
@@ -3444,6 +3604,8 @@ abstract class AstVisitor<R> {
 
   R visitCompilationUnit(CompilationUnit node);
 
+  R visitConstantValuePattern(ConstantValuePattern node);
+
   R visitConditionalExpression(ConditionalExpression node);
 
   R visitConstructorDeclaration(ConstructorDeclaration node);
@@ -3502,6 +3664,8 @@ abstract class AstVisitor<R> {
 
   R visitHideCombinator(HideCombinator node);
 
+  R visitIdentifierPattern(IdentifierPattern node);
+
   R visitIfStatement(IfStatement node);
 
   R visitImplementsClause(ImplementsClause node);
@@ -3530,6 +3694,8 @@ abstract class AstVisitor<R> {
 
   R visitListLiteral(ListLiteral node);
 
+  R visitLiteralPattern(LiteralPattern literalPattern);
+
   R visitMapLiteral(MapLiteral node);
 
   R visitMapLiteralEntry(MapLiteralEntry node);
@@ -3556,8 +3722,6 @@ abstract class AstVisitor<R> {
 
   R visitPartOfDirective(PartOfDirective node);
 
-  R visitPattern(Pattern node);
-
   R visitPatternGuard(PatternGuard node);
 
   R visitPostfixExpression(PostfixExpression node);
@@ -3567,6 +3731,8 @@ abstract class AstVisitor<R> {
   R visitPrefixExpression(PrefixExpression node);
 
   R visitPropertyAccess(PropertyAccess node);
+
+  R visitRangePattern(RangePattern node);
 
   R visitRedirectingConstructorInvocation(
       RedirectingConstructorInvocation node);
@@ -3997,7 +4163,7 @@ class BlockFunctionBody extends FunctionBody {
  * > booleanLiteral ::=
  * >     'false' | 'true'
  */
-class BooleanLiteral extends Literal {
+class BooleanLiteral extends TerminalLiteral {
   /**
    * The token representing the literal.
    */
@@ -6771,7 +6937,7 @@ class DoStatement extends Statement {
  * > exponent ::=
  * >     ('e' | 'E') ('+' | '-')? decimalDigit+
  */
-class DoubleLiteral extends Literal {
+class DoubleLiteral extends NumberLiteral {
   /**
    * The token representing the literal.
    */
@@ -9191,6 +9357,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
       visitExpression(node);
 
   @override
+  R visitConstantValuePattern(ConstantValuePattern node) => visitPattern(node);
+
+  @override
   R visitConstructorDeclaration(ConstructorDeclaration node) =>
       visitClassMember(node);
 
@@ -9221,7 +9390,7 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitDoStatement(DoStatement node) => visitStatement(node);
 
   @override
-  R visitDoubleLiteral(DoubleLiteral node) => visitLiteral(node);
+  R visitDoubleLiteral(DoubleLiteral node) => visitNumberLiteral(node);
 
   @override
   R visitEmptyFunctionBody(EmptyFunctionBody node) => visitFunctionBody(node);
@@ -9300,6 +9469,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitIdentifier(Identifier node) => visitExpression(node);
 
   @override
+  R visitIdentifierPattern(IdentifierPattern node) => visitPattern(node);
+
+  @override
   R visitIfStatement(IfStatement node) => visitStatement(node);
 
   @override
@@ -9316,7 +9488,7 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
       visitExpression(node);
 
   @override
-  R visitIntegerLiteral(IntegerLiteral node) => visitLiteral(node);
+  R visitIntegerLiteral(IntegerLiteral node) => visitNumberLiteral(node);
 
   R visitInterpolationElement(InterpolationElement node) => visitNode(node);
 
@@ -9347,6 +9519,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitListLiteral(ListLiteral node) => visitTypedLiteral(node);
 
   R visitLiteral(Literal node) => visitExpression(node);
+
+  @override
+  R visitLiteralPattern(LiteralPattern node) => visitPattern(node);
 
   @override
   R visitMapLiteral(MapLiteral node) => visitTypedLiteral(node);
@@ -9390,7 +9565,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
       visitFormalParameter(node);
 
   @override
-  R visitNullLiteral(NullLiteral node) => visitLiteral(node);
+  R visitNullLiteral(NullLiteral node) => visitTerminalLiteral(node);
+
+  R visitNumberLiteral(NumberLiteral node) => visitTerminalLiteral(node);
 
   @override
   R visitParenthesizedExpression(ParenthesizedExpression node) =>
@@ -9402,8 +9579,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   @override
   R visitPartOfDirective(PartOfDirective node) => visitDirective(node);
 
-  @override
   R visitPattern(Pattern node) => visitNode(node);
+
+  R visitPatternLiteral(LiteralPattern node) => visitPattern(node);
 
   @override
   R visitPatternGuard(PatternGuard node) => visitNode(node);
@@ -9419,6 +9597,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPropertyAccess(PropertyAccess node) => visitExpression(node);
+
+  @override
+  R visitRangePattern(RangePattern node) => visitPattern(node);
 
   @override
   R visitRedirectingConstructorInvocation(
@@ -9457,7 +9638,7 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitStringInterpolation(StringInterpolation node) =>
       visitSingleStringLiteral(node);
 
-  R visitStringLiteral(StringLiteral node) => visitLiteral(node);
+  R visitStringLiteral(StringLiteral node) => visitTerminalLiteral(node);
 
   @override
   R visitSuperConstructorInvocation(SuperConstructorInvocation node) =>
@@ -9478,7 +9659,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitSwitchStatement(SwitchStatement node) => visitStatement(node);
 
   @override
-  R visitSymbolLiteral(SymbolLiteral node) => visitLiteral(node);
+  R visitSymbolLiteral(SymbolLiteral node) => visitTerminalLiteral(node);
+
+  R visitTerminalLiteral(TerminalLiteral node) => visitLiteral(node);
 
   @override
   R visitThisExpression(ThisExpression node) => visitExpression(node);
@@ -10273,6 +10456,10 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
   }
 
   @override
+  ConstantValuePattern visitConstantValuePattern(ConstantValuePattern node) =>
+      new ConstantValuePattern(_cloneNode(node.identifier));
+
+  @override
   ConstructorDeclaration visitConstructorDeclaration(
       ConstructorDeclaration node) {
     ConstructorDeclaration copy = new ConstructorDeclaration(
@@ -10542,6 +10729,10 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
       _mapToken(node.keyword), _cloneNodeList(node.hiddenNames));
 
   @override
+  IdentifierPattern visitIdentifierPattern(IdentifierPattern node) =>
+      new IdentifierPattern(_cloneNode(node.identifier));
+
+  @override
   IfStatement visitIfStatement(IfStatement node) => new IfStatement(
       _mapToken(node.ifKeyword),
       _mapToken(node.leftParenthesis),
@@ -10659,6 +10850,12 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
         new LibraryIdentifier(_cloneNodeList(node.components));
     copy.propagatedType = node.propagatedType;
     copy.staticType = node.staticType;
+    return copy;
+  }
+
+  @override
+  Pattern visitLiteralPattern(LiteralPattern node) {
+    Pattern copy = new LiteralPattern(_cloneNode(node.literal));
     return copy;
   }
 
@@ -10810,12 +11007,6 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
   }
 
   @override
-  Pattern visitPattern(Pattern node) {
-    Pattern copy = new Pattern(_cloneNode(node.pattern));
-    return copy;
-  }
-
-  @override
   PatternGuard visitPatternGuard(PatternGuard node) {
     PatternGuard copy = new PatternGuard(
         _mapToken(node.ifKeyword),
@@ -10862,6 +11053,13 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
         _mapToken(node.operator), _cloneNode(node.propertyName));
     copy.propagatedType = node.propagatedType;
     copy.staticType = node.staticType;
+    return copy;
+  }
+
+  @override
+  RangePattern visitRangePattern(RangePattern node) {
+    RangePattern copy = new RangePattern(_cloneNode(node.startRange),
+        _mapToken(node.dots), _cloneNode(node.endRange));
     return copy;
   }
 
@@ -11512,6 +11710,15 @@ class InstanceCreationExpression extends Expression {
 }
 
 /**
+ * A node that represents a number literal expression.
+ *
+ * > numberLiteral ::=
+ * >     [DoubleLiteral]
+ * >   | [IntegerLiteral]
+ */
+abstract class NumberLiteral extends TerminalLiteral {}
+
+/**
  * An integer literal expression.
  *
  * > integerLiteral ::=
@@ -11525,7 +11732,7 @@ class InstanceCreationExpression extends Expression {
  * >     '0x' hexidecimalDigit+
  * >   | '0X' hexidecimalDigit+
  */
-class IntegerLiteral extends Literal {
+class IntegerLiteral extends NumberLiteral {
   /**
    * The token representing the literal.
    */
@@ -12151,6 +12358,17 @@ abstract class Literal extends Expression {
   @override
   int get precedence => 16;
 }
+
+/**
+ * A node that represents a literal expression.
+ *
+ * > literal ::=
+ * >     [BooleanLiteral]
+ * >   | [NumberLiteral]
+ * >   | [NullLiteral]
+ * >   | [StringLiteral]
+ */
+abstract class TerminalLiteral extends Literal {}
 
 /**
  * A literal map.
@@ -13580,6 +13798,15 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   @override
+  bool visitConstantValuePattern(ConstantValuePattern node) {
+    if (identical(node.identifier, _oldNode)) {
+      node.identifier = _newNode as PrefixedIdentifier;
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
   bool visitConstructorDeclaration(ConstructorDeclaration node) {
     if (identical(node.returnType, _oldNode)) {
       node.returnType = _newNode as Identifier;
@@ -13885,6 +14112,15 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   @override
+  bool visitIdentifierPattern(IdentifierPattern node) {
+    if (identical(node.identifier, _oldNode)) {
+      node.identifier = _newNode as SimpleIdentifier;
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
   bool visitIfStatement(IfStatement node) {
     if (identical(node.condition, _oldNode)) {
       node.condition = _newNode as Expression;
@@ -13999,6 +14235,15 @@ class NodeReplacer implements AstVisitor<bool> {
   @override
   bool visitLibraryIdentifier(LibraryIdentifier node) {
     if (_replaceInList(node.components)) {
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
+  bool visitLiteralPattern(LiteralPattern node) {
+    if (identical(node.literal, _oldNode)) {
+      node.literal = _newNode as TerminalLiteral;
       return true;
     }
     return visitNode(node);
@@ -14169,15 +14414,6 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   @override
-  bool visitPattern(Pattern node) {
-    if (identical(node.pattern, _oldNode)) {
-      node.pattern = _newNode as Literal;
-      return true;
-    }
-    return visitNode(node);
-  }
-
-  @override
   bool visitPatternGuard(PatternGuard node) {
     if (identical(node.condition, _oldNode)) {
       node.condition = _newNode as Expression;
@@ -14223,6 +14459,18 @@ class NodeReplacer implements AstVisitor<bool> {
       return true;
     } else if (identical(node.propertyName, _oldNode)) {
       node.propertyName = _newNode as SimpleIdentifier;
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
+  bool visitRangePattern(RangePattern node) {
+    if (identical(node.startRange, _oldNode)) {
+      node.startRange = _newNode as NumberLiteral;
+      return true;
+    } else if (identical(node.endRange, _oldNode)) {
+      node.endRange = _newNode as NumberLiteral;
       return true;
     }
     return visitNode(node);
@@ -14663,7 +14911,7 @@ abstract class NormalFormalParameter extends FormalParameter {
  * > nullLiteral ::=
  * >     'null'
  */
-class NullLiteral extends Literal {
+class NullLiteral extends TerminalLiteral {
   /**
    * The token representing the literal.
    */
@@ -15597,6 +15845,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitConstantValuePattern(ConstantValuePattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitConstructorDeclaration(ConstructorDeclaration node) {
     node.visitChildren(this);
     return null;
@@ -15765,6 +16019,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitIdentifierPattern(IdentifierPattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitIfStatement(IfStatement node) {
     node.visitChildren(this);
     return null;
@@ -15849,6 +16109,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitLiteralPattern(LiteralPattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitMapLiteral(MapLiteral node) {
     node.visitChildren(this);
     return null;
@@ -15927,12 +16193,6 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
-  R visitPattern(Pattern node) {
-    node.visitChildren(this);
-    return null;
-  }
-
-  @override
   R visitPatternGuard(PatternGuard node) {
     node.visitChildren(this);
     return null;
@@ -15958,6 +16218,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPropertyAccess(PropertyAccess node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
+  R visitRangePattern(RangePattern node) {
     node.visitChildren(this);
     return null;
   }
@@ -16712,6 +16978,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
   R visitConditionalExpression(ConditionalExpression node) => null;
 
   @override
+  R visitConstantValuePattern(ConstantValuePattern node) => null;
+
+  @override
   R visitConstructorDeclaration(ConstructorDeclaration node) => null;
 
   @override
@@ -16799,6 +17068,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
   R visitHideCombinator(HideCombinator node) => null;
 
   @override
+  R visitIdentifierPattern(IdentifierPattern node) => null;
+
+  @override
   R visitIfStatement(IfStatement node) => null;
 
   @override
@@ -16841,6 +17113,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
   R visitListLiteral(ListLiteral node) => null;
 
   @override
+  R visitLiteralPattern(LiteralPattern node) => null;
+
+  @override
   R visitMapLiteral(MapLiteral node) => null;
 
   @override
@@ -16880,9 +17155,6 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
   R visitPartOfDirective(PartOfDirective node) => null;
 
   @override
-  R visitPattern(Pattern node) => null;
-
-  @override
   R visitPatternGuard(PatternGuard node) => null;
 
   @override
@@ -16896,6 +17168,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPropertyAccess(PropertyAccess node) => null;
+
+  @override
+  R visitRangePattern(RangePattern node) => null;
 
   @override
   R visitRedirectingConstructorInvocation(
@@ -17212,6 +17487,8 @@ class SimpleIdentifier extends Identifier {
       return identical(this, parent.name);
     } else if (parent is FunctionTypeAlias) {
       return identical(this, parent.name);
+    } else if (parent is IdentifierPattern) {
+      return identical(this, parent.identifier);
     } else if (parent is ImportDirective) {
       return identical(this, parent.prefix);
     } else if (parent is Label) {
@@ -17727,7 +18004,7 @@ class StringLexemeHelper {
  * >   | [AdjacentStrings]
  * >   | [StringInterpolation]
  */
-abstract class StringLiteral extends Literal {
+abstract class StringLiteral extends TerminalLiteral {
   /**
    * Return the value of the string literal, or `null` if the string is not a
    * constant string without any string interpolation.
@@ -18198,7 +18475,7 @@ class SwitchStatement extends Statement {
  * > symbolLiteral ::=
  * >     '#' (operator | (identifier ('.' identifier)*))
  */
-class SymbolLiteral extends Literal {
+class SymbolLiteral extends TerminalLiteral {
   /**
    * The token introducing the literal.
    */
@@ -18635,6 +18912,12 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitConstantValuePattern(ConstantValuePattern node) {
+    _visitNode(node.identifier);
+    return null;
+  }
+
+  @override
   Object visitConstructorDeclaration(ConstructorDeclaration node) {
     _visitNodeListWithSeparatorAndSuffix(node.metadata, " ", " ");
     _visitTokenWithSuffix(node.externalKeyword, " ");
@@ -18931,6 +19214,12 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitIdentifierPattern(IdentifierPattern node) {
+    _visitNode(node.identifier);
+    return null;
+  }
+
+  @override
   Object visitIfStatement(IfStatement node) {
     _writer.print("if (");
     _visitNode(node.condition);
@@ -19062,6 +19351,12 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitLiteralPattern(LiteralPattern node) {
+    _visitNode(node.literal);
+    return null;
+  }
+
+  @override
   Object visitMapLiteral(MapLiteral node) {
     if (node.constKeyword != null) {
       _writer.print(node.constKeyword.lexeme);
@@ -19189,12 +19484,6 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
-  Object visitPattern(Pattern node) {
-    _visitNode(node.pattern);
-    return null;
-  }
-
-  @override
   Object visitPatternGuard(PatternGuard node) {
     _writer.print("if (");
     _visitNode(node.condition);
@@ -19233,6 +19522,14 @@ class ToSourceVisitor implements AstVisitor<Object> {
       _writer.print(node.operator.lexeme);
     }
     _visitNode(node.propertyName);
+    return null;
+  }
+
+  @override
+  Object visitRangePattern(RangePattern node) {
+    _visitNode(node.startRange);
+    _writer.print("...");
+    _visitNode(node.endRange);
     return null;
   }
 
@@ -20195,6 +20492,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
   R visitConditionalExpression(ConditionalExpression node) => visitNode(node);
 
   @override
+  R visitConstantValuePattern(ConstantValuePattern node) => visitNode(node);
+
+  @override
   R visitConstructorDeclaration(ConstructorDeclaration node) => visitNode(node);
 
   @override
@@ -20284,6 +20584,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
   R visitHideCombinator(HideCombinator node) => visitNode(node);
 
   @override
+  R visitIdentifierPattern(IdentifierPattern node) => visitNode(node);
+
+  @override
   R visitIfStatement(IfStatement node) => visitNode(node);
 
   @override
@@ -20326,6 +20629,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitListLiteral(ListLiteral node) => visitNode(node);
+
+  @override
+  R visitLiteralPattern(LiteralPattern node) => visitNode(node);
 
   @override
   R visitMapLiteral(MapLiteral node) => visitNode(node);
@@ -20373,9 +20679,6 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
   R visitPartOfDirective(PartOfDirective node) => visitNode(node);
 
   @override
-  R visitPattern(Pattern node) => visitNode(node);
-
-  @override
   R visitPatternGuard(PatternGuard node) => visitNode(node);
 
   @override
@@ -20389,6 +20692,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitPropertyAccess(PropertyAccess node) => visitNode(node);
+
+  @override
+  R visitRangePattern(RangePattern node) => visitNode(node);
 
   @override
   R visitRedirectingConstructorInvocation(

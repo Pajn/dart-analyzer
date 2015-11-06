@@ -185,6 +185,12 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitConstantValuePattern(ConstantValuePattern node) {
+    ConstantValuePattern other = this.other;
+    _visitNode(node.identifier, other.identifier);
+  }
+
+  @override
   visitConstructorDeclaration(ConstructorDeclaration node) {
     ConstructorDeclaration other = this.other;
     _visitDeclaration(node, other);
@@ -386,6 +392,12 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitIdentifierPattern(IdentifierPattern node) {
+    IdentifierPattern other = this.other;
+    _visitNode(node.identifier, other.identifier);
+  }
+
+  @override
   visitIfStatement(IfStatement node) {
     IfStatement other = this.other;
     _visitNode(node.condition, other.condition);
@@ -483,6 +495,12 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitLiteralPattern(LiteralPattern node) {
+    LiteralPattern other = this.other;
+    _visitNode(node.literal, other.literal);
+  }
+
+  @override
   visitMapLiteral(MapLiteral node) {
     MapLiteral other = this.other;
     _visitExpression(node, other);
@@ -568,12 +586,6 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
-  visitPattern(Pattern node) {
-    Pattern other = this.other;
-    _visitNode(node.pattern, other.pattern);
-  }
-
-  @override
   visitPatternGuard(PatternGuard node) {
     PatternGuard other = this.other;
     _visitNode(node.condition, other.condition);
@@ -611,6 +623,13 @@ class _SameResolutionValidator implements AstVisitor {
     _visitExpression(node, other);
     _visitNode(node.target, other.target);
     _visitNode(node.propertyName, other.propertyName);
+  }
+
+  @override
+  visitRangePattern(RangePattern node) {
+    RangePattern other = this.other;
+    _visitNode(node.startRange, other.startRange);
+    _visitNode(node.endRange, other.endRange);
   }
 
   @override

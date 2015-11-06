@@ -745,6 +745,11 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitConstantValuePattern(ConstantValuePattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
   AstNode visitConstructorDeclaration(ConstructorDeclaration node) {
     if (identical(_oldNode, node.documentationComment)) {
       throw new InsufficientContextException();
@@ -1052,6 +1057,11 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitIdentifierPattern(IdentifierPattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
   AstNode visitIfStatement(IfStatement node) {
     if (identical(_oldNode, node.condition)) {
       return _parser.parseExpression2();
@@ -1186,6 +1196,11 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitLiteralPattern(LiteralPattern node) {
+    // TODO: implement visitPattern
+  }
+
+  @override
   AstNode visitMapLiteral(MapLiteral node) {
     if (identical(_oldNode, node.typeArguments)) {
       return _parser.parseTypeArgumentList();
@@ -1316,11 +1331,6 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
-  AstNode visitPattern(Pattern node) {
-    // TODO: implement visitPattern
-  }
-
-  @override
   AstNode visitPatternGuard(PatternGuard node) {
     // TODO: implement visitPatternGuard
   }
@@ -1359,6 +1369,11 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
       return _parser.parseSimpleIdentifier();
     }
     return _notAChild(node);
+  }
+
+  @override
+  AstNode visitRangePattern(RangePattern node) {
+    // TODO: implement visitPattern
   }
 
   @override
@@ -6577,10 +6592,20 @@ class Parser {
    */
   MatchClause _parseMatchClause() {
     Pattern pattern = _parsePattern();
+    PatternGuard patternGuard;
+    if (_matchesKeyword(Keyword.IF)) {
+      Token ifKeyword = _expectKeyword(Keyword.IF);
+      Token leftParenthesis = _expect(TokenType.OPEN_PAREN);
+      Expression condition = parseExpression2();
+      Token rightParenthesis = _expect(TokenType.CLOSE_PAREN);
+
+      patternGuard = new PatternGuard(ifKeyword, leftParenthesis,
+          condition, rightParenthesis);
+    }
     Token fatArrow = _expect(TokenType.FUNCTION);
     ExpressionStatement armExpression = new ExpressionStatement(
         parseExpression2(), _expect(TokenType.SEMICOLON));
-    return new MatchClause(pattern, null, fatArrow, armExpression);
+    return new MatchClause(pattern, patternGuard, fatArrow, armExpression);
   }
 
   /**
@@ -7120,6 +7145,39 @@ class Parser {
         commentAndMetadata.metadata, partKeyword, partUri, semicolon);
   }
 
+  NumberLiteral parseNumberLiteral() {
+    if (_matches(TokenType.DOUBLE)) {
+      Token token = getAndAdvance();
+      double value = 0.0;
+      try {
+        value = double.parse(token.lexeme);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new DoubleLiteral(token, value);
+    } else if (_matches(TokenType.HEXADECIMAL)) {
+      Token token = getAndAdvance();
+      int value = null;
+      try {
+        value = int.parse(token.lexeme.substring(2), radix: 16);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new IntegerLiteral(token, value);
+    } else if (_matches(TokenType.INT)) {
+      Token token = getAndAdvance();
+      int value = null;
+      try {
+        value = int.parse(token.lexeme);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new IntegerLiteral(token, value);
+    } else {
+      throw 'this is so bad';
+    }
+  }
+
   /**
    * Parse a pattern. Return the pattern that was parsed.
    *
@@ -7129,45 +7187,37 @@ class Parser {
    *       | numericLiteral
    *       | stringLiteral
    *       | symbolLiteral
+   *       | rangePattern
    */
   Pattern _parsePattern() {
     if (_matchesKeyword(Keyword.NULL)) {
-      return new Pattern(new NullLiteral(getAndAdvance()));
+      return new LiteralPattern(new NullLiteral(getAndAdvance()));
     } else if (_matchesKeyword(Keyword.FALSE)) {
-      return new Pattern(new BooleanLiteral(getAndAdvance(), false));
+      return new LiteralPattern(new BooleanLiteral(getAndAdvance(), false));
     } else if (_matchesKeyword(Keyword.TRUE)) {
-      return new Pattern(new BooleanLiteral(getAndAdvance(), true));
-    } else if (_matches(TokenType.DOUBLE)) {
-      Token token = getAndAdvance();
-      double value = 0.0;
-      try {
-        value = double.parse(token.lexeme);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
+      return new LiteralPattern(new BooleanLiteral(getAndAdvance(), true));
+    } else if (_matches(TokenType.DOUBLE) ||
+               _matches(TokenType.HEXADECIMAL) ||
+               _matches(TokenType.INT)) {
+      NumberLiteral number = parseNumberLiteral();
+
+      if (_matches(TokenType.PERIOD_PERIOD_PERIOD)) {
+        Token dots = getAndAdvance();
+        return new RangePattern(number, dots, parseNumberLiteral());
+      } else {
+        return new LiteralPattern(number);
       }
-      return new Pattern(new DoubleLiteral(token, value));
-    } else if (_matches(TokenType.HEXADECIMAL)) {
-      Token token = getAndAdvance();
-      int value = null;
-      try {
-        value = int.parse(token.lexeme.substring(2), radix: 16);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
-      }
-      return new Pattern(new IntegerLiteral(token, value));
-    } else if (_matches(TokenType.INT)) {
-      Token token = getAndAdvance();
-      int value = null;
-      try {
-        value = int.parse(token.lexeme);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
-      }
-      return new Pattern(new IntegerLiteral(token, value));
     } else if (_matches(TokenType.STRING)) {
-      return new Pattern(parseStringLiteral());
+      return new LiteralPattern(parseStringLiteral());
     } else if (_matches(TokenType.HASH)) {
-      return new Pattern(_parseSymbolLiteral());
+      return new LiteralPattern(_parseSymbolLiteral());
+    } else if (_matchesIdentifier()) {
+      Identifier identifier = parsePrefixedIdentifier();
+      if (identifier is SimpleIdentifier) {
+        return new IdentifierPattern(identifier);
+      } else {
+        return new ConstantValuePattern(identifier);
+      }
     } else {
       _reportErrorForCurrentToken(ParserErrorCode.MISSING_IDENTIFIER);
     }
@@ -7261,33 +7311,10 @@ class Parser {
       return new BooleanLiteral(getAndAdvance(), false);
     } else if (_matchesKeyword(Keyword.TRUE)) {
       return new BooleanLiteral(getAndAdvance(), true);
-    } else if (_matches(TokenType.DOUBLE)) {
-      Token token = getAndAdvance();
-      double value = 0.0;
-      try {
-        value = double.parse(token.lexeme);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
-      }
-      return new DoubleLiteral(token, value);
-    } else if (_matches(TokenType.HEXADECIMAL)) {
-      Token token = getAndAdvance();
-      int value = null;
-      try {
-        value = int.parse(token.lexeme.substring(2), radix: 16);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
-      }
-      return new IntegerLiteral(token, value);
-    } else if (_matches(TokenType.INT)) {
-      Token token = getAndAdvance();
-      int value = null;
-      try {
-        value = int.parse(token.lexeme);
-      } on FormatException {
-        // The invalid format should have been reported by the scanner.
-      }
-      return new IntegerLiteral(token, value);
+    } else if (_matches(TokenType.DOUBLE) ||
+               _matches(TokenType.HEXADECIMAL) ||
+               _matches(TokenType.INT)) {
+      return parseNumberLiteral();
     } else if (_matches(TokenType.STRING)) {
       return parseStringLiteral();
     } else if (_matches(TokenType.OPEN_CURLY_BRACKET)) {
@@ -10045,6 +10072,12 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
+  bool visitConstantValuePattern(ConstantValuePattern node) {
+    ConstantValuePattern toNode = this._toNode as ConstantValuePattern;
+    return _isEqualNodes(node.identifier, toNode.identifier);
+  }
+
+  @override
   bool visitConstructorDeclaration(ConstructorDeclaration node) {
     ConstructorDeclaration toNode = this._toNode as ConstructorDeclaration;
     if (_and(
@@ -10370,6 +10403,12 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
+  bool visitIdentifierPattern(IdentifierPattern node) {
+    IdentifierPattern toNode = this._toNode as IdentifierPattern;
+    return _isEqualNodes(node.identifier, toNode.identifier);
+  }
+
+  @override
   bool visitIfStatement(IfStatement node) {
     IfStatement toNode = this._toNode as IfStatement;
     return _and(
@@ -10542,6 +10581,12 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
+  bool visitLiteralPattern(LiteralPattern node) {
+    LiteralPattern toNode = this._toNode as LiteralPattern;
+    return _isEqualNodes(node.literal, toNode.literal);
+  }
+
+  @override
   bool visitMapLiteral(MapLiteral node) {
     MapLiteral toNode = this._toNode as MapLiteral;
     if (_and(
@@ -10710,12 +10755,6 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
-  bool visitPattern(Pattern node) {
-    Pattern toNode = this._toNode as Pattern;
-    return _isEqualNodes(node.pattern, toNode.pattern);
-  }
-
-  @override
   bool visitPatternGuard(PatternGuard node) {
     PatternGuard toNode = this._toNode as PatternGuard;
     return _and(
@@ -10779,6 +10818,15 @@ class ResolutionCopier implements AstVisitor<bool> {
       return true;
     }
     return false;
+  }
+
+  @override
+  bool visitRangePattern(RangePattern node) {
+    RangePattern toNode = this._toNode as RangePattern;
+    return _and(
+        _isEqualNodes(node.startRange, toNode.startRange),
+        _isEqualTokens(node.dots, toNode.dots),
+        _isEqualNodes(node.endRange, toNode.endRange));
   }
 
   @override
