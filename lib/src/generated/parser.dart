@@ -2903,6 +2903,8 @@ class Parser {
     } else if (_matchesKeyword(Keyword.RETHROW)) {
       // TODO(brianwilkerson) Rethrow is a statement again.
       return _parseRethrowExpression();
+    } else if (_matchesKeyword(Keyword.MATCH)) {
+      return _parseMatchExpression();
     }
     //
     // assignableExpression is a subset of conditionalExpression, so we can
@@ -2938,12 +2940,15 @@ class Parser {
    *         assignableExpression assignmentOperator expressionWithoutCascade
    *       | conditionalExpression
    *       | throwExpressionWithoutCascade
+   *       | matchExpression
    */
   Expression parseExpressionWithoutCascade() {
     if (_matchesKeyword(Keyword.THROW)) {
       return _parseThrowExpressionWithoutCascade();
     } else if (_matchesKeyword(Keyword.RETHROW)) {
       return _parseRethrowExpression();
+    } else if (_matchesKeyword(Keyword.MATCH)) {
+      return _parseMatchExpression();
     }
     //
     // assignableExpression is a subset of conditionalExpression, so we can
@@ -6565,6 +6570,40 @@ class Parser {
   }
 
   /**
+   * Parse a match expression. Return the expression that was parsed.
+   *
+   *     matchClause ::=
+   *         pattern patternGuard? '=>' expressionStatement
+   */
+  MatchClause _parseMatchClause() {
+    Pattern pattern = new Pattern(parseStringLiteral());
+    Token fatArrow = _expect(TokenType.FUNCTION);
+    ExpressionStatement armExpression = new ExpressionStatement(
+        parseExpression2(), _expect(TokenType.SEMICOLON));
+    return new MatchClause(pattern, null, fatArrow, armExpression);
+  }
+
+  /**
+   * Parse a match expression. Return the expression that was parsed.
+   *
+   *     matchExpression ::=
+   *         'match' '(' expression ')' '{' matchClause* '}'
+   */
+  MatchExpression _parseMatchExpression() {
+    Token matchKeyword = _expectKeyword(Keyword.MATCH);
+    Token leftParenthesis = _expect(TokenType.OPEN_PAREN);
+    Expression expression = parseExpression2();
+    Token rightParenthesis = _expect(TokenType.CLOSE_PAREN);
+    Token leftBracket = _expect(TokenType.OPEN_CURLY_BRACKET);
+    List<MatchClause> clauses = new List<MatchClause>();
+    while (!_matches(TokenType.CLOSE_CURLY_BRACKET)) {
+      clauses.add(_parseMatchClause());
+    }
+    return new MatchExpression(
+        matchKeyword, leftParenthesis, expression, rightParenthesis, leftBracket, clauses, getAndAdvance());
+  }
+
+  /**
    * Parse a method declaration. The [commentAndMetadata] is the documentation
    * comment and metadata to be associated with the declaration. The
    * [externalKeyword] is the 'external' token. The [staticKeyword] is the
@@ -7079,6 +7118,15 @@ class Parser {
     Token semicolon = _expect(TokenType.SEMICOLON);
     return new PartDirective(commentAndMetadata.comment,
         commentAndMetadata.metadata, partKeyword, partUri, semicolon);
+  }
+
+  /**
+   * Parse a pattern. Return the pattern that was parsed.
+   *
+   *     pattern ::=
+   *         literal
+   */
+  Pattern _parsePattern() {
   }
 
   /**
@@ -10487,14 +10535,19 @@ class ResolutionCopier implements AstVisitor<bool> {
   @override
   bool visitMatchExpression(MatchExpression node) {
     MatchExpression toNode = this._toNode as MatchExpression;
-    return _and(
+    if (_and(
         _isEqualTokens(node.matchKeyword, toNode.matchKeyword),
         _isEqualTokens(node.leftParenthesis, toNode.leftParenthesis),
         _isEqualNodes(node.expression, toNode.expression),
         _isEqualTokens(node.rightParenthesis, toNode.rightParenthesis),
         _isEqualTokens(node.leftBracket, toNode.leftBracket),
         _isEqualNodeLists(node.clauses, toNode.clauses),
-        _isEqualTokens(node.rightBracket, toNode.rightBracket));
+        _isEqualTokens(node.rightBracket, toNode.rightBracket))) {
+      toNode.propagatedType = node.propagatedType;
+      toNode.staticType = node.staticType;
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -10614,12 +10667,18 @@ class ResolutionCopier implements AstVisitor<bool> {
 
   @override
   bool visitPattern(Pattern node) {
-    // TODO: implement visitPattern
+    Pattern toNode = this._toNode as Pattern;
+    return _isEqualNodes(node.pattern, toNode.pattern);
   }
 
   @override
   bool visitPatternGuard(PatternGuard node) {
-    // TODO: implement visitPatternGuard
+    PatternGuard toNode = this._toNode as PatternGuard;
+    return _and(
+        _isEqualTokens(node.ifKeyword, toNode.ifKeyword),
+        _isEqualTokens(node.leftParenthesis, toNode.leftParenthesis),
+        _isEqualNodes(node.condition, toNode.condition),
+        _isEqualTokens(node.rightParenthesis, toNode.rightParenthesis));
   }
 
   @override
