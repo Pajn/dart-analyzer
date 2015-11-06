@@ -6576,7 +6576,7 @@ class Parser {
    *         pattern patternGuard? '=>' expressionStatement
    */
   MatchClause _parseMatchClause() {
-    Pattern pattern = new Pattern(parseStringLiteral());
+    Pattern pattern = _parsePattern();
     Token fatArrow = _expect(TokenType.FUNCTION);
     ExpressionStatement armExpression = new ExpressionStatement(
         parseExpression2(), _expect(TokenType.SEMICOLON));
@@ -7124,9 +7124,53 @@ class Parser {
    * Parse a pattern. Return the pattern that was parsed.
    *
    *     pattern ::=
-   *         literal
+   *         nullLiteral
+   *       | booleanLiteral
+   *       | numericLiteral
+   *       | stringLiteral
+   *       | symbolLiteral
    */
   Pattern _parsePattern() {
+    if (_matchesKeyword(Keyword.NULL)) {
+      return new Pattern(new NullLiteral(getAndAdvance()));
+    } else if (_matchesKeyword(Keyword.FALSE)) {
+      return new Pattern(new BooleanLiteral(getAndAdvance(), false));
+    } else if (_matchesKeyword(Keyword.TRUE)) {
+      return new Pattern(new BooleanLiteral(getAndAdvance(), true));
+    } else if (_matches(TokenType.DOUBLE)) {
+      Token token = getAndAdvance();
+      double value = 0.0;
+      try {
+        value = double.parse(token.lexeme);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new Pattern(new DoubleLiteral(token, value));
+    } else if (_matches(TokenType.HEXADECIMAL)) {
+      Token token = getAndAdvance();
+      int value = null;
+      try {
+        value = int.parse(token.lexeme.substring(2), radix: 16);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new Pattern(new IntegerLiteral(token, value));
+    } else if (_matches(TokenType.INT)) {
+      Token token = getAndAdvance();
+      int value = null;
+      try {
+        value = int.parse(token.lexeme);
+      } on FormatException {
+        // The invalid format should have been reported by the scanner.
+      }
+      return new Pattern(new IntegerLiteral(token, value));
+    } else if (_matches(TokenType.STRING)) {
+      return new Pattern(parseStringLiteral());
+    } else if (_matches(TokenType.HASH)) {
+      return new Pattern(_parseSymbolLiteral());
+    } else {
+      _reportErrorForCurrentToken(ParserErrorCode.MISSING_IDENTIFIER);
+    }
   }
 
   /**
