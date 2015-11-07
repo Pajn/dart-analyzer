@@ -517,7 +517,7 @@ class _SameResolutionValidator implements AstVisitor {
   @override
   visitMatchClause(MatchClause node) {
     MatchClause other = this.other;
-    _visitNode(node.pattern, other.pattern);
+    _visitList(node.patterns, other.patterns);
     _visitNode(node.patternGuard, other.patternGuard);
     _visitNode(node.armExpression, other.armExpression);
   }

@@ -1229,7 +1229,7 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitMatchClause(MatchClause node) {
-    if (identical(_oldNode, node.pattern)) {
+    if (node.patterns.contains(_oldNode)) {
       return _parser.parsePattern();
     } else if (identical(_oldNode, node.patternGuard)) {
       return _parser.parsePatternGuard();
@@ -6623,12 +6623,17 @@ class Parser {
    *         pattern patternGuard? '=>' expressionStatement
    */
   MatchClause _parseMatchClause() {
-    Pattern pattern = parsePattern();
+    List<Pattern> patterns = [];
+    patterns.add(parsePattern());
+    while (_matches(TokenType.BAR)) {
+      getAndAdvance();
+      patterns.add(parsePattern());
+    }
     PatternGuard patternGuard = parsePatternGuard();
     Token fatArrow = _expect(TokenType.FUNCTION);
     ExpressionStatement armExpression = new ExpressionStatement(
         parseExpression2(), _expect(TokenType.SEMICOLON));
-    return new MatchClause(pattern, patternGuard, fatArrow, armExpression);
+    return new MatchClause(patterns, patternGuard, fatArrow, armExpression);
   }
 
   /**
@@ -10663,7 +10668,7 @@ class ResolutionCopier implements AstVisitor<bool> {
   bool visitMatchClause(MatchClause node) {
     MatchClause toNode = this._toNode as MatchClause;
     return _and(
-        _isEqualNodes(node.pattern, toNode.pattern),
+        _isEqualNodeLists(node.patterns, toNode.patterns),
         _isEqualNodes(node.patternGuard, toNode.patternGuard),
         _isEqualTokens(node.fatArrow, toNode.fatArrow),
         _isEqualNodes(node.armExpression, toNode.armExpression));

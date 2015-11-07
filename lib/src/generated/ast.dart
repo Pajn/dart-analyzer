@@ -790,7 +790,7 @@ class MatchExpression extends Expression {
     ..add(_expression)
     ..add(rightParenthesis)
     ..add(leftBracket)
-    ..add(_clauses)
+    ..addAll(_clauses)
     ..add(rightBracket);
 
   @override
@@ -811,7 +811,7 @@ class MatchExpression extends Expression {
 }
 
 class MatchClause extends AstNode {
-  Pattern _pattern;
+  NodeList<Pattern> _patterns;
 
   PatternGuard _patternGuard;
 
@@ -820,20 +820,16 @@ class MatchClause extends AstNode {
   ExpressionStatement _armExpression;
 
   MatchClause(
-    Pattern pattern,
+    List<Pattern> patterns,
     PatternGuard patternGuard,
     this.fatArrow,
     ExpressionStatement armExpression) {
-    _pattern = _becomeParentOf(pattern);
+    _patterns = new NodeList<Pattern>(this, patterns);
     _patternGuard = _becomeParentOf(patternGuard);
     _armExpression = _becomeParentOf(armExpression);
   }
 
-  Pattern get pattern => _pattern;
-
-  void set pattern(Pattern pattern) {
-    _pattern = _becomeParentOf(pattern);
-  }
+  NodeList<Pattern> get patterns => _patterns;
 
   PatternGuard get patternGuard => _patternGuard;
 
@@ -848,11 +844,11 @@ class MatchClause extends AstNode {
   }
 
   @override
-  Token get beginToken => _pattern.beginToken;
+  Token get beginToken => _patterns.beginToken;
 
   @override
   Iterable get childEntities => new ChildEntities()
-    ..add(_pattern)
+    ..addAll(_patterns)
     ..add(_patternGuard)
     ..add(fatArrow)
     ..add(_armExpression);
@@ -865,7 +861,7 @@ class MatchClause extends AstNode {
 
   @override
   void visitChildren(AstVisitor visitor) {
-    _safelyVisitChild(_pattern, visitor);
+    _patterns.accept(visitor);
     _safelyVisitChild(_patternGuard, visitor);
     _safelyVisitChild(_armExpression, visitor);
   }
@@ -1957,7 +1953,7 @@ class AstCloner implements AstVisitor<AstNode> {
 
   @override
   AstNode visitMatchClause(MatchClause node) => new MatchClause(
-      cloneNode(node.pattern),
+      cloneNodeList(node.patterns),
       cloneNode(node.patternGuard),
       cloneToken(node.fatArrow),
       cloneNode(node.armExpression));
@@ -2967,7 +2963,7 @@ class AstComparator implements AstVisitor<bool> {
   @override
   bool visitMatchClause(MatchClause node) {
     MatchClause other = _other as MatchClause;
-    return isEqualNodes(node.pattern, other.pattern) &&
+    return _isEqualNodeLists(node.patterns, other.patterns) &&
         isEqualNodes(node.patternGuard, other.patternGuard) &&
         isEqualTokens(node.fatArrow, other.fatArrow) &&
         isEqualNodes(node.armExpression, other.armExpression);
@@ -10962,7 +10958,7 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
   @override
   MatchClause visitMatchClause(MatchClause node) {
     MatchClause copy = new MatchClause(
-        _cloneNode(node.pattern),
+        _cloneNodeList(node.patterns),
         _cloneNode(node.patternGuard),
         _mapToken(node.fatArrow),
         _cloneNode(node.armExpression));
@@ -14354,8 +14350,7 @@ class NodeReplacer implements AstVisitor<bool> {
 
   @override
   bool visitMatchClause(MatchClause node) {
-    if (identical(node.pattern, _oldNode)) {
-      node.pattern = _newNode as Pattern;
+    if (_replaceInList(node.patterns)) {
       return true;
     } else if (identical(node.patternGuard, _oldNode)) {
       node.patternGuard = _newNode as PatternGuard;
@@ -19477,7 +19472,7 @@ class ToSourceVisitor implements AstVisitor<Object> {
 
   @override
   Object visitMatchClause(MatchClause node) {
-    _visitNode(node.pattern);
+    _visitNodeListWithSeparator(node.patterns, " | ");
     _visitNode(node.patternGuard);
     _writer.print("=>");
     _visitNode(node.armExpression);
@@ -19583,7 +19578,7 @@ class ToSourceVisitor implements AstVisitor<Object> {
 
   @override
   Object visitPatternGuard(PatternGuard node) {
-    _writer.print("if (");
+    _writer.print(" if (");
     _visitNode(node.condition);
     _writer.print(")");
     return null;
