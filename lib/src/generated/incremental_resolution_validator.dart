@@ -237,6 +237,12 @@ class _SameResolutionValidator implements AstVisitor {
   }
 
   @override
+  visitDestructuredListPattern(DestructuredListPattern node) {
+    DestructuredListPattern other = this.other;
+    _visitList(node.elements, other.elements);
+  }
+
+  @override
   visitDoStatement(DoStatement node) {
     DoStatement other = this.other;
     _visitNode(node.condition, other.condition);

@@ -10271,6 +10271,16 @@ class ResolutionCopier implements AstVisitor<bool> {
   }
 
   @override
+  bool visitDestructuredListPattern(DestructuredListPattern node) {
+    DestructuredListPattern toNode = this._toNode as DestructuredListPattern;
+    return _and(
+        _isEqualTokens(node.leftBracket, toNode.leftBracket),
+        _isEqualNodeLists(node.elements, toNode.elements),
+        _isEqualTokens(node.restOperator, toNode.restOperator),
+        _isEqualTokens(node.rightBracket, toNode.rightBracket));
+  }
+
+  @override
   bool visitDoStatement(DoStatement node) {
     DoStatement toNode = this._toNode as DoStatement;
     return _and(

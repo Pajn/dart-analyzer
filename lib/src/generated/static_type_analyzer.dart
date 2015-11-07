@@ -418,6 +418,26 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<Object> {
     return null;
   }
 
+  @override
+  Object visitIdentifierPattern(IdentifierPattern node) {
+    AstNode parent = node.parent;
+    while (parent is! MatchExpression) {
+      parent = parent.parent;
+    }
+    MatchExpression match = parent as MatchExpression;
+    if (_strongMode) {
+      _inferPatternMatchVariableType(node, match.expression);
+    }
+    DartType rightType = match.expression.bestType;
+    SimpleIdentifier identifier = node.identifier;
+    _resolver.recordPropagatedTypeIfBetter(identifier, rightType);
+    VariableElement element = identifier.staticElement as VariableElement;
+    if (element != null) {
+      _resolver.overrideVariable(element, rightType, true);
+    }
+    return null;
+  }
+
   /**
    * The Dart Language Specification, 12.29: <blockquote>An assignable expression of the form
    * <i>e<sub>1</sub>[e<sub>2</sub>]</i> is evaluated as a method invocation of the operator method
@@ -1209,6 +1229,26 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<Object> {
   }
 
   @override
+  Object visitTypeTestPattern(TypeTestPattern node) {
+    AstNode parent = node.parent;
+    while (parent is! MatchExpression) {
+      parent = parent.parent;
+    }
+    MatchExpression match = parent as MatchExpression;
+    if (_strongMode) {
+      _inferPatternMatchVariableType(node, match.expression);
+    }
+    DartType rightType = match.expression.bestType;
+    SimpleIdentifier identifier = node.identifier;
+    _resolver.recordPropagatedTypeIfBetter(identifier, rightType);
+    VariableElement element = identifier.staticElement as VariableElement;
+    if (element != null) {
+      _resolver.overrideVariable(element, rightType, true);
+    }
+    return null;
+  }
+
+  @override
   Object visitVariableDeclaration(VariableDeclaration node) {
     Expression initializer = node.initializer;
     if (_strongMode) {
@@ -1816,6 +1856,15 @@ class StaticTypeAnalyzer extends SimpleAstVisitor<Object> {
       return true;
     }
     return false;
+  }
+
+  void _inferPatternMatchVariableType(
+      DefinesIdentifierPattern node, Expression expression) {
+    if (expression.staticType != null && !expression.staticType.isBottom) {
+      LocalVariableElementImpl element = node.identifier.staticElement;
+      element.type = expression.staticType;
+      node.identifier.staticType = expression.staticType;
+    }
   }
 
   /**
