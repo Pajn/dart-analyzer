@@ -205,6 +205,14 @@ class DelegatingAstVisitor<T> implements AstVisitor<T> {
   }
 
   @override
+  T visitDestructuredListPattern(DestructuredListPattern node) {
+    _delegates
+        .forEach((delegate) => delegate.visitDestructuredListPattern(node));
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   T visitDoStatement(DoStatement node) {
     _delegates.forEach((delegate) => delegate.visitDoStatement(node));
     node.visitChildren(this);

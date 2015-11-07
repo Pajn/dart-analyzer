@@ -3114,10 +3114,11 @@ class ElementBuilder extends RecursiveAstVisitor<Object> {
     SimpleIdentifier variableName = node.identifier;
     LocalVariableElementImpl element =
         new LocalVariableElementImpl.forNode(variableName);
-    MatchClause clause = node.parent as MatchClause;
-    int declarationEnd = node.offset + node.length;
-    int statementEnd = clause.offset + clause.length;
-    element.setVisibleRange(declarationEnd, statementEnd - declarationEnd - 1);
+    AstNode parent = node.parent;
+    while (parent is! MatchClause) {
+      parent = parent.parent;
+    }
+    element.setVisibleRange(parent.offset, parent.length);
     element.const3 = false;
     element.final2 = false;
     element.hasImplicitType = true;
@@ -3352,10 +3353,11 @@ class ElementBuilder extends RecursiveAstVisitor<Object> {
     SimpleIdentifier variableName = node.identifier;
     LocalVariableElementImpl element =
     new LocalVariableElementImpl.forNode(variableName);
-    MatchClause clause = node.parent as MatchClause;
-    int declarationEnd = node.offset + node.length;
-    int statementEnd = clause.offset + clause.length;
-    element.setVisibleRange(declarationEnd, statementEnd - declarationEnd - 1);
+    AstNode parent = node.parent;
+    while (parent is! MatchClause) {
+      parent = parent.parent;
+    }
+    element.setVisibleRange(parent.offset, parent.length);
     element.const3 = false;
     element.final2 = false;
     if (node.type == null) {
@@ -12682,7 +12684,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
   Object visitIdentifierPattern(IdentifierPattern node) {
     VariableElement element = node.element;
     if (element != null) {
-      nameScope.define(element);
+      nameScope.defineWithoutChecking(element);
     }
     super.visitIdentifierPattern(node);
     return null;
@@ -12814,7 +12816,7 @@ abstract class ScopedVisitor extends UnifyingAstVisitor<Object> {
   Object visitTypeTestPattern(TypeTestPattern node) {
     VariableElement element = node.element;
     if (element != null) {
-      nameScope.define(element);
+      nameScope.defineWithoutChecking(element);
     }
     super.visitTypeTestPattern(node);
     return null;

@@ -956,6 +956,82 @@ class IdentifierPattern extends DefinesIdentifierPattern {
   }
 }
 
+class DestructuredListPattern extends Pattern {
+  Token leftBracket;
+
+  NodeList<Pattern> _elements;
+
+  Token restOperator;
+
+  Token rightBracket;
+
+  DestructuredListPattern(
+      this.leftBracket,
+      List<Pattern> elements,
+      this.restOperator,
+      this.rightBracket) {
+    _elements = new NodeList<Pattern>(this, elements);
+  }
+
+  NodeList<Pattern> get elements => _elements;
+
+  @override
+  Token get beginToken => leftBracket;
+
+  @override
+  Iterable get childEntities => new ChildEntities()
+    ..addAll(_elements);
+
+  @override
+  Token get endToken => rightBracket;
+
+  @override
+  accept(AstVisitor visitor) => visitor.visitDestructuredListPattern(this);
+
+  @override
+  void visitChildren(AstVisitor visitor) {
+    _elements.accept(visitor);
+  }
+}
+
+//class DestructuredObjectPattern extends Pattern {
+//  Token leftBracket;
+//
+//  NodeList<Pattern> _properties;
+//
+//  Token tokenRestOperator;
+//
+//  Token rightBracket;
+//
+//  DestructuredObjectPattern(
+//      this.leftBracket,
+//      NodeList<Pattern> properties,
+//      this.tokenRestOperator,
+//      this.rightBracket) {
+//    _properties = new NodeList<Pattern>(this, properties);
+//  }
+//
+//  NodeList<Pattern> get elements() => _properties;
+//
+//  @override
+//  Token get beginToken => leftBracket;
+//
+//  @override
+//  Iterable get childEntities => new ChildEntities()
+//    ..addAll(_properties);
+//
+//  @override
+//  Token get endToken => rightBracket;
+//
+//  @override
+//  accept(AstVisitor visitor) => visitor.visitDestructuredListPattern(this);
+//
+//  @override
+//  void visitChildren(AstVisitor visitor) {
+//    _properties.accept(visitor);
+//  }
+//}
+
 class LiteralPattern extends Pattern {
   TerminalLiteral _literal;
 
@@ -1629,6 +1705,11 @@ class AstCloner implements AstVisitor<AstNode> {
           DefaultFormalParameter node) =>
       new DefaultFormalParameter(cloneNode(node.parameter), node.kind,
           cloneToken(node.separator), cloneNode(node.defaultValue));
+
+  @override
+  DestructuredListPattern visitDestructuredListPattern(DestructuredListPattern node) =>
+      new DestructuredListPattern(cloneToken(node.leftBracket), cloneNodeList(node.elements),
+          cloneToken(node.restOperator), cloneToken(node.rightBracket));
 
   @override
   DoStatement visitDoStatement(DoStatement node) => new DoStatement(
@@ -2567,6 +2648,15 @@ class AstComparator implements AstVisitor<bool> {
         node.kind == other.kind &&
         isEqualTokens(node.separator, other.separator) &&
         isEqualNodes(node.defaultValue, other.defaultValue);
+  }
+
+  @override
+  bool visitDestructuredListPattern(DestructuredListPattern node) {
+    DestructuredListPattern other = _other as DestructuredListPattern;
+    return isEqualTokens(node.leftBracket, other.leftBracket) &&
+        _isEqualNodeLists(node.elements, other.elements) &&
+        isEqualTokens(node.restOperator, other.restOperator) &&
+        isEqualTokens(node.rightBracket, other.rightBracket);
   }
 
   @override
@@ -3679,6 +3769,8 @@ abstract class AstVisitor<R> {
   R visitDeclaredIdentifier(DeclaredIdentifier node);
 
   R visitDefaultFormalParameter(DefaultFormalParameter node);
+
+  R visitDestructuredListPattern(DestructuredListPattern node);
 
   R visitDoStatement(DoStatement node);
 
@@ -9446,6 +9538,9 @@ class GeneralizingAstVisitor<R> implements AstVisitor<R> {
   R visitDefaultFormalParameter(DefaultFormalParameter node) =>
       visitFormalParameter(node);
 
+  @override
+  R visitDestructuredListPattern(DestructuredListPattern node) => visitPattern(node);
+
   R visitDirective(Directive node) => visitAnnotatedNode(node);
 
   @override
@@ -10582,6 +10677,13 @@ class IncrementalAstCloner implements AstVisitor<AstNode> {
           DefaultFormalParameter node) =>
       new DefaultFormalParameter(_cloneNode(node.parameter), node.kind,
           _mapToken(node.separator), _cloneNode(node.defaultValue));
+
+  @override
+  DestructuredListPattern visitDestructuredListPattern(
+          DestructuredListPattern node) =>
+      new DestructuredListPattern(_mapToken(node.leftBracket),
+          _cloneNodeList(node.elements), _mapToken(node.restOperator),
+          _mapToken(node.rightBracket));
 
   @override
   DoStatement visitDoStatement(DoStatement node) => new DoStatement(
@@ -13958,6 +14060,14 @@ class NodeReplacer implements AstVisitor<bool> {
   }
 
   @override
+  bool visitDestructuredListPattern(DestructuredListPattern node) {
+    if (_replaceInList(node.elements)) {
+      return true;
+    }
+    return visitNode(node);
+  }
+
+  @override
   bool visitDoStatement(DoStatement node) {
     if (identical(node.body, _oldNode)) {
       node.body = _newNode as Statement;
@@ -15971,6 +16081,12 @@ class RecursiveAstVisitor<R> implements AstVisitor<R> {
   }
 
   @override
+  R visitDestructuredListPattern(DestructuredListPattern node) {
+    node.visitChildren(this);
+    return null;
+  }
+
+  @override
   R visitDoStatement(DoStatement node) {
     node.visitChildren(this);
     return null;
@@ -17087,6 +17203,9 @@ class SimpleAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitDefaultFormalParameter(DefaultFormalParameter node) => null;
+
+  @override
+  R visitDestructuredListPattern(DestructuredListPattern node) => null;
 
   @override
   R visitDoStatement(DoStatement node) => null;
@@ -19070,6 +19189,17 @@ class ToSourceVisitor implements AstVisitor<Object> {
   }
 
   @override
+  Object visitDestructuredListPattern(DestructuredListPattern node) {
+    _writer.print("[");
+    _visitNodeListWithSeparator(node.elements, ", ");
+    if (node.restOperator != null) {
+      _writer.print("...");
+    }
+    _writer.print("]");
+    return null;
+  }
+
+  @override
   Object visitDoStatement(DoStatement node) {
     _writer.print("do ");
     _visitNode(node.body);
@@ -20617,6 +20747,9 @@ class UnifyingAstVisitor<R> implements AstVisitor<R> {
 
   @override
   R visitDefaultFormalParameter(DefaultFormalParameter node) => visitNode(node);
+
+  @override
+  R visitDestructuredListPattern(DestructuredListPattern node) => visitNode(node);
 
   @override
   R visitDoStatement(DoStatement node) => visitNode(node);

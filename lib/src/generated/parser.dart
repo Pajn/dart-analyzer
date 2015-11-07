@@ -827,6 +827,14 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   }
 
   @override
+  AstNode visitDestructuredListPattern(DestructuredListPattern node) {
+    if (node.elements.contains(_oldNode)) {
+      return _parser.parsePattern();
+    }
+    return _notAChild(node);
+  }
+
+  @override
   AstNode visitDoStatement(DoStatement node) {
     if (identical(_oldNode, node.body)) {
       return _parser.parseStatement2();
@@ -7257,6 +7265,56 @@ class Parser {
         }
       } else {
         return new ConstantValuePattern(identifier);
+      }
+    } else if (_matches(TokenType.INDEX)) {
+      // may be empty list literal
+      BeginToken leftBracket = _createToken(
+          _currentToken, TokenType.OPEN_SQUARE_BRACKET,
+          isBegin: true);
+      Token rightBracket =
+          new Token(TokenType.CLOSE_SQUARE_BRACKET, _currentToken.offset + 1);
+      leftBracket.endToken = rightBracket;
+      rightBracket.setNext(_currentToken.next);
+      leftBracket.setNext(rightBracket);
+      _currentToken.previous.setNext(leftBracket);
+      _currentToken = _currentToken.next;
+      return new DestructuredListPattern(leftBracket, null, null, rightBracket);
+    } else if (_matches(TokenType.OPEN_SQUARE_BRACKET)) {
+      Token leftBracket = getAndAdvance();
+      List<Pattern> elements = [];
+      DestructuredListPattern pattern;
+      tryParseEnd({bool expectEnd: false}) {
+        if (_matches(TokenType.PERIOD_PERIOD_PERIOD)) {
+          return new DestructuredListPattern(leftBracket, elements, getAndAdvance(),
+              _expect(TokenType.CLOSE_SQUARE_BRACKET));
+        }
+        if (expectEnd) {
+          return new DestructuredListPattern(leftBracket, elements, null,
+              _expect(TokenType.CLOSE_SQUARE_BRACKET));
+        } else if (_matches(TokenType.CLOSE_SQUARE_BRACKET)) {
+          return new DestructuredListPattern(leftBracket, elements, null, getAndAdvance());
+        }
+      }
+
+      pattern = tryParseEnd();
+      if (pattern != null) {
+        return pattern;
+      }
+
+      bool wasInInitializer = _inInitializer;
+      _inInitializer = false;
+      try {
+        elements.add(parsePattern());
+        while (_optional(TokenType.COMMA)) {
+          pattern = tryParseEnd();
+          if (pattern != null) {
+            return pattern;
+          }
+          elements.add(parsePattern());
+        }
+        return tryParseEnd(expectEnd: true);
+      } finally {
+        _inInitializer = wasInInitializer;
       }
     } else {
       _reportErrorForCurrentToken(ParserErrorCode.MISSING_IDENTIFIER);
