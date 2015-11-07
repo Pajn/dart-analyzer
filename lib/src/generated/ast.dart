@@ -14372,7 +14372,9 @@ class NodeReplacer implements AstVisitor<bool> {
     if (identical(node.expression, _oldNode)) {
       node.expression = _newNode as Expression;
       return true;
-    } //TODO: clauses
+    } else if (_replaceInList(node.clauses)) {
+      return true;
+    }
     return visitNode(node);
   }
 

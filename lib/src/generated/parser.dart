@@ -746,7 +746,10 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitConstantValuePattern(ConstantValuePattern node) {
-    // TODO: implement visitPattern
+    if (identical(_oldNode, node.identifier)) {
+      return _parser.parsePrefixedIdentifier();
+    }
+    return _notAChild(node);
   }
 
   @override
@@ -1058,7 +1061,10 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitIdentifierPattern(IdentifierPattern node) {
-    // TODO: implement visitPattern
+    if (identical(_oldNode, node.identifier)) {
+      return _parser.parseSimpleIdentifier();
+    }
+    return _notAChild(node);
   }
 
   @override
@@ -1198,6 +1204,7 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
   @override
   AstNode visitLiteralPattern(LiteralPattern node) {
     // TODO: implement visitPattern
+    throw new InsufficientContextException();
   }
 
   @override
@@ -1222,12 +1229,19 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitMatchClause(MatchClause node) {
-    // TODO: implement visitMatchClause
+    if (identical(_oldNode, node.pattern)) {
+      return _parser.parsePattern();
+    } else if (identical(_oldNode, node.patternGuard)) {
+      return _parser.parsePatternGuard();
+    } else if (identical(_oldNode, node.armExpression)) {
+      return _parser.parseExpression2();
+    }
+    return _notAChild(node);
   }
 
   @override
   AstNode visitMatchExpression(MatchExpression node) {
-    // TODO: implement visitMatchExpression
+    throw new InsufficientContextException();
   }
 
   @override
@@ -1332,7 +1346,10 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitPatternGuard(PatternGuard node) {
-    // TODO: implement visitPatternGuard
+    if (identical(_oldNode, node.condition)) {
+      return _parser.parseExpression2();
+    }
+    return _notAChild(node);
   }
 
   @override
@@ -1373,7 +1390,12 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitRangePattern(RangePattern node) {
-    // TODO: implement visitPattern
+    if (identical(_oldNode, node.startRange)) {
+      return _parser.parseNumberLiteral();
+    } else if (identical(_oldNode, node.endRange)) {
+      return _parser.parseNumberLiteral();
+    }
+    return _notAChild(node);
   }
 
   @override
@@ -1566,7 +1588,12 @@ class IncrementalParseDispatcher implements AstVisitor<AstNode> {
 
   @override
   AstNode visitTypeTestPattern(TypeTestPattern node) {
-    // TODO: implement visitPattern
+    if (identical(_oldNode, node.identifier)) {
+      return _parser.parseSimpleIdentifier();
+    } else if (identical(_oldNode, node.type)) {
+      return _parser.parseTypeName();
+    }
+    return _notAChild(node);
   }
 
   @override
@@ -6596,17 +6623,8 @@ class Parser {
    *         pattern patternGuard? '=>' expressionStatement
    */
   MatchClause _parseMatchClause() {
-    Pattern pattern = _parsePattern();
-    PatternGuard patternGuard;
-    if (_matchesKeyword(Keyword.IF)) {
-      Token ifKeyword = _expectKeyword(Keyword.IF);
-      Token leftParenthesis = _expect(TokenType.OPEN_PAREN);
-      Expression condition = parseExpression2();
-      Token rightParenthesis = _expect(TokenType.CLOSE_PAREN);
-
-      patternGuard = new PatternGuard(ifKeyword, leftParenthesis,
-          condition, rightParenthesis);
-    }
+    Pattern pattern = parsePattern();
+    PatternGuard patternGuard = parsePatternGuard();
     Token fatArrow = _expect(TokenType.FUNCTION);
     ExpressionStatement armExpression = new ExpressionStatement(
         parseExpression2(), _expect(TokenType.SEMICOLON));
@@ -6912,6 +6930,9 @@ class Parser {
         return _parseForStatement();
       } else if (keyword == Keyword.IF) {
         return _parseIfStatement();
+      } else if (keyword == Keyword.MATCH) {
+        return new ExpressionStatement(
+            _parseMatchExpression(), _expect(TokenType.SEMICOLON));
       } else if (keyword == Keyword.RETHROW) {
         return new ExpressionStatement(
             _parseRethrowExpression(), _expect(TokenType.SEMICOLON));
@@ -7194,7 +7215,7 @@ class Parser {
    *       | symbolLiteral
    *       | rangePattern
    */
-  Pattern _parsePattern() {
+  Pattern parsePattern() {
     if (_matchesKeyword(Keyword.NULL)) {
       return new LiteralPattern(new NullLiteral(getAndAdvance()));
     } else if (_matchesKeyword(Keyword.FALSE)) {
@@ -7235,6 +7256,19 @@ class Parser {
     } else {
       _reportErrorForCurrentToken(ParserErrorCode.MISSING_IDENTIFIER);
     }
+  }
+
+  PatternGuard parsePatternGuard() {
+    if (_matchesKeyword(Keyword.IF)) {
+      Token ifKeyword = _expectKeyword(Keyword.IF);
+      Token leftParenthesis = _expect(TokenType.OPEN_PAREN);
+      Expression condition = parseExpression2();
+      Token rightParenthesis = _expect(TokenType.CLOSE_PAREN);
+
+      return new PatternGuard(ifKeyword, leftParenthesis, condition,
+          rightParenthesis);
+    }
+    return null;
   }
 
   /**
